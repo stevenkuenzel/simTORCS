@@ -1,20 +1,20 @@
 package simtorcs.geometry
 
-/**
- * https://stackoverflow.com/a/565282
- */
+
 class LineSegment(val from : Vector2, val to : Vector2) {
     // p = from
     // p + r = to
     // r = to - from
 
-    val r = to.subtract(from)
+    private val r = to.subtract(from)
 
+    /**
+     * Determines the intersection point of two line segments.
+     *
+     * Source: https://stackoverflow.com/a/565282
+     */
     fun intersect(other : LineSegment) : Vector2?
     {
-        // q = other.from
-        // s = other.r
-
         val qp = other.from.subtract(from)
         val qpr = qp.cross(r)
         val rs = r.cross(other.r)

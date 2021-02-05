@@ -3,14 +3,19 @@ package simtorcs.race
 import simtorcs.car.Car
 import simtorcs.track.Track
 
-class Race(val track: Track, val tMax : Int = 6000) {
+/**
+ * A race instance.
+ */
+class Race(val track: Track, val noise : Boolean, val tMax : Int = 6000) {
+    companion object
+    {
+        val FPS = 50
+        val DT = 1.0 / FPS.toDouble()
 
-    val fps = 50
-    val dt = 1.0 / fps.toDouble()
+    }
+
     val cars = mutableListOf<Car>()
-
     var tNow = 0
-
     var raceFinished = false
 
 
@@ -24,10 +29,18 @@ class Race(val track: Track, val tMax : Int = 6000) {
         if (!raceFinished) raceEnd()
     }
 
+    fun createCar() : Car
+    {
+        val car = Car(this, noise)
+        cars.add(car)
+
+        return car
+    }
+
     fun update()
     {
         for (car in cars) {
-            car.update(dt)
+            car.update(DT)
         }
 
         if (cars.all { it.disqualified }) raceEnd()

@@ -4,9 +4,13 @@ import simtorcs.race.Race
 import simtorcs.track.CoordinateSegment
 import simtorcs.track.TurnDirection
 import simtorcs.geometry.Vector2
+import simtorcs.track.Track
 import java.awt.*
 import kotlin.math.abs
 
+/**
+ * For visualization on a JFrame.
+ */
 class RaceAWTComponent(val race: Race, val drawSize: Int) : Component() {
 
     override fun paint(g: Graphics?) {
@@ -17,8 +21,8 @@ class RaceAWTComponent(val race: Race, val drawSize: Int) : Component() {
         for (segment in race.track.segments) {
             g2d.color = when (segment) {
                 is CoordinateSegment -> when {
-                    segment.turn == TurnDirection.Right && abs(segment.turnAngle) >= race.track.minTurnRad && segment.measuredLength <= race.track.maxCurveSegmentLengthSqr -> Color.RED
-                    segment.turn == TurnDirection.Left && abs(segment.turnAngle) >= race.track.minTurnRad && segment.measuredLength <= race.track.maxCurveSegmentLengthSqr -> Color.BLUE
+                    segment.turn == TurnDirection.Right && abs(segment.turnAngle) >= race.track.minTurnRad && segment.measuredLength <= Track.MAX_TURN_SEGMENT_LENGTH_SQR -> Color.RED
+                    segment.turn == TurnDirection.Left && abs(segment.turnAngle) >= race.track.minTurnRad && segment.measuredLength <=  Track.MAX_TURN_SEGMENT_LENGTH_SQR -> Color.BLUE
                     else -> Color.GREEN
                 }
                 else -> Color.BLACK
@@ -36,15 +40,15 @@ class RaceAWTComponent(val race: Race, val drawSize: Int) : Component() {
             }
 
             // Draw the ideal line.
-            g2d.color = Color.BLUE
-            val axis = segment.getNormIdeal()
-
-            g2d.drawLine(
-                (axis.from.x * drawSize.toDouble()).toInt(),
-                (axis.from.y * drawSize.toDouble()).toInt(),
-                (axis.to.x * drawSize.toDouble()).toInt(),
-                (axis.to.y * drawSize.toDouble()).toInt()
-            )
+//            g2d.color = Color.BLUE
+//            val axis = segment.getNormIdeal()
+//
+//            g2d.drawLine(
+//                (axis.from.x * drawSize.toDouble()).toInt(),
+//                (axis.from.y * drawSize.toDouble()).toInt(),
+//                (axis.to.x * drawSize.toDouble()).toInt(),
+//                (axis.to.y * drawSize.toDouble()).toInt()
+//            )
         }
 
 
@@ -67,9 +71,6 @@ class RaceAWTComponent(val race: Race, val drawSize: Int) : Component() {
 
             g2d.drawOval(x - 4, y - 4, 8, 8)
             g2d.drawLine(x, y, xTo, yTo)
-
-//            g2d.drawString(round(car.absVel * 3.6).toString(), 150, 100)
-//            g2d.drawString("${car.vTarget}", 200, 100)
         }
     }
 }

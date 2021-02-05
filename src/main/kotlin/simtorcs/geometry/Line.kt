@@ -1,6 +1,7 @@
 package simtorcs.geometry
 
 class Line(val from: Vector2, val to: Vector2) {
+
     fun intersect(other: Line): Vector2? {
         val v1 = (from.x * to.y - from.y * to.x)
         val v2 = (other.from.x - other.to.x)

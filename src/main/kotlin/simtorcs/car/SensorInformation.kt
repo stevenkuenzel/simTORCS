@@ -6,20 +6,20 @@ import kotlin.math.abs
 
 class SensorInformation(val noise : Boolean, numOfSensors : Int) {
     val random : UniformRandomProvider = RandomSource.create(RandomSource.MT)!! // Use the Mersenne Twister random number generator.
-    val minSpeed = 50.0 / 3.6
+//    val minSpeed = 50.0 / 3.6
     val maxSpeed = 330.0 / 3.6
     val sensorRange = 200.0
 
     var angleToTrackAxis = 0.0
-    var angleToTrackIdeal = 0.0
+//    var angleToTrackIdeal = 0.0
 
     var roundsFinished = 0
     var segmentPosition = 0.0
 
     var distanceToTrackAxis = 0.0
-    var distanceToTrackIdeal = 0.0
+//    var distanceToTrackIdeal = 0.0
 
-    var absVel = 0.0
+    var absoluteVelocity = 0.0
 
     var sensorData = Array(numOfSensors) {0.0}
 

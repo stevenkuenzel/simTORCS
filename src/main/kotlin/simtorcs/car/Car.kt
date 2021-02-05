@@ -5,124 +5,137 @@ import simtorcs.geometry.LineSegment
 import simtorcs.geometry.Vector2
 import simtorcs.race.Race
 import simtorcs.track.Segment
-import simtorcs.util.GeometryUtils
+import simtorcs.geometry.GeometryUtils
 import kotlin.math.*
 
 class Car(private val race: Race, noisySensors: Boolean) {
 
     companion object {
-        private fun defineSensorAngles(from: Double, to: Double, number: Int): Array<Double> {
-            val angles = mutableListOf<Double>()
+//        private fun defineSensorAngles(from: Double, to: Double, number: Int): Array<Double> {
+//            val angles = mutableListOf<Double>()
+//
+//            val total = abs(from) + abs(to)
+//            val step = total / (number - 1).toDouble()
+//
+//            var value = from
+//
+//            angles.add(-value)
+//
+//            for (i in 1 until number) {
+//                value += step
+//                angles.add(-value)
+//
+//            }
+//
+//            return angles.toTypedArray()
+//        }
 
-            val total = abs(from) + abs(to)
-            val step = total / (number - 1).toDouble()
-
-            var value = from
-
-            angles.add(-value)
-
-            for (i in 1 until number) {
-                value += step
-                angles.add(-value)
-
-            }
-
-            return angles.toTypedArray()
-        }
+        val RANGE_TRACK_EDGE_SENSOR_LEFT = -45
+        val RANGE_TRACK_EDGE_SENSOR_RIGHT = 45
+        val ANGLE_BETWEEN_TRACK_EDGE_SENSORS = 5
 
         private fun defineSensorAngles(from: Int, to: Int, stepSize: Int): Array<Double> {
             val angles = mutableListOf<Double>()
 
             for (x in from..to step stepSize) {
-                angles.add(-x.toDouble() / (180.0) * PI)
+                angles.add((-x.toDouble() / 180.0) * PI)
             }
 
             return angles.toTypedArray()
         }
+
+
+        /**
+         * FITNESS RELATED CONSTANTS.
+         */
+
+        /**
+         * The maximum possible turn speed is multiplied with that constant. If the car is driving faster through the turn than the resulting value, it positively contributes to the corresponding fitness value.
+         */
+        val TURN_SPEED_MULTIPLIER = 0.95
+
+        /**
+         * The distance at which the possible speed is linearly reduced to the turn speed. In meters.
+         */
+        val TURN_SPEED_DISTANCE_MAX = 50.0
+
+        /**
+         * The maximum inclination of the steering wheel to be the car considered as driving straight. (In percent of STEER_MAX radians).
+         */
+        val THRESHOLD_DRIVING_STRAIGHT = 0.05
+
+        /**
+         * Maximum steering angle in radians
+         */
+        private val STEER_MAX = 0.366519
+
+
+        /**
+         * PHYSICS RELATED CONSTANTS.
+         */
+
+        // Car configuration. Based on the properties of car1-trb1 in TORCS.
+        private val PHYSICS_GRAVITY = 9.81  // m/s^2
+        private val PHYSICS_MASS = 1150.0  // kg
+        private val PHYSICS_INERTIA_SCALE = 1.0  // Multiply by mass for inertia
+        private val PHYSICS_CG_TO_FRONT_AXLE = 0.97  // Centre gravity to front axle
+        private val PHYSICS_CG_TO_REAR_AXLE = 0.97  // Centre gravity to rear axle
+        private val PHYSICS_CG_HEIGHT = 0.25  // Centre gravity height
+        private val PHYSICS_TIRE_GRIP = 2.0  // How much grip tires have
+        private val PHYSICS_WEIGHT_TRANSFER = 0.2  // How much weight is transferred during acceleration/braking
+        private val PHYSICS_CORNER_STIFFNESS_FRONT = 5.0
+        private val PHYSICS_CORNER_STIFFNESS_REAR = 5.2
+        private val PHYSICS_AIR_RESIST = 2.5    // air resistance (* vel)
+        private val PHYSICS_ROLL_RESIST = 8.0   // rolling resistance force (* vel)
+        private val PHYSICS_INERTIA = PHYSICS_MASS * PHYSICS_INERTIA_SCALE
+        private val PHYSICS_WHEEL_BASE = PHYSICS_CG_TO_FRONT_AXLE + PHYSICS_CG_TO_REAR_AXLE
+        private val PHYSICS_AXLE_WEIGHT_RATIO_FRONT =
+            PHYSICS_CG_TO_REAR_AXLE / this.PHYSICS_WHEEL_BASE // % car weight on the front axle
+        private val PHYSICS_AXLE_WEIGHT_RATIO_REAR =
+            PHYSICS_CG_TO_FRONT_AXLE / this.PHYSICS_WHEEL_BASE // % car weight on the rear axle
+
+        // Constants determined according to the description in my dissertation.
+        private val PHYSICS_ENGINE_FORCE = 11900.0
+        private val PHYSICS_BRAKE_FORCE = 26300.0
+
     }
 
     private var controller: CarController? = null
-
     val track = race.track
 
-    var sensors: Array<Vector2>? = null
-    var indicesToConsider = Array(0) { 0 }
-    var previousSegment: Segment? = null
-    var wasOffTrack = false
+
+//    var visitedSegments = 0
 
 
-    var visitedSegments = 0
-    var distanceRaced = 0.0
-    var totalDistanceToIdeal = 0.0
-    var speedReachedMax = 0.0
-
-
-    val maxSteer = 0.366519  // Maximum steering angle in radians
-
-    val sensorAngles = defineSensorAngles(-45, 45, 5)
-
-    var currentSegment: Segment? = null
-    var lastValidSegment: Segment? = null
-
-    var currentStep = 0
     var totalDistanceFromTrack = 0.0
     var totalSpeed = 0.0
 
     var disqualified = false
+//    var wasOffTrack = false
 
+    var sensors: Array<Vector2>? = null
+    private val sensorAngles = defineSensorAngles(RANGE_TRACK_EDGE_SENSOR_LEFT, RANGE_TRACK_EDGE_SENSOR_RIGHT, ANGLE_BETWEEN_TRACK_EDGE_SENSORS)
+    var sensorInformation = SensorInformation(noisySensors, sensorAngles.size)
     var heading = track.startingDirection
     var position = track.startingPoint.copy()
+    var currentSegment: Segment? = null
+    var lastValidSegment: Segment? = null
+    var previousSegment: Segment? = null
 
 
-    var velocity = Vector2()
-    var velocity_c = Vector2()
-    var accel = Vector2()
-    var accel_c = Vector2()
-    var absVel = 0.0
-    var yawRate = 0.0
-
+    // Input / Control.
     var throttle = 0.0
     var brake = 0.0
     var steerAngle = 0.0
 
 
-    // Car configuration.
-    val gravity = 9.81  // m/s^2
-    val mass = 1150.0  // kg
-    val inertiaScale = 1.0  // Multiply by mass for inertia
-    val halfWidth = 0.97 // Centre to side of chassis (metres)
-    val cgToFront = 2.3504 // Centre of gravity to front of chassis (metres)
-    val cgToRear = 2.1696   // Centre of gravity to rear of chassis
-    val cgToFrontAxle = 0.97  // Centre gravity to front axle
-    val cgToRearAxle = 0.97  // Centre gravity to rear axle
-    val cgHeight = 0.25  // Centre gravity height
+    // Fitness.
 
-    val tireGrip = 2.0  // How much grip tires have
-
-    // ANNRACER:
-    // acc: 8.579664582906522 * x + 72.34940739001144
-    // dec: -90.13773558596135 * x + 191.35322287960696
-
-    val engineForce = 11900.0
-    val brakeForce = 26300.0
-
-    val weightTransfer = 0.2  // How much weight is transferred during acceleration/braking
-    val cornerStiffnessFront = 5.0
-    val cornerStiffnessRear = 5.2
-    val airResist = 2.5    // air resistance (* vel)
-    val rollResist = 8.0   // rolling resistance force (* vel)
-
-    val inertia = mass * inertiaScale
-    val wheelBase = cgToFrontAxle + cgToRearAxle
-    val axleWeightRatioFront = cgToRearAxle / this.wheelBase // % car weight on the front axle
-    val axleWeightRatioRear = cgToFrontAxle / this.wheelBase // % car weight on the rear axle
-
-
-    val constantTurnSpeed = 0.95
-    val constantTurnDistanceConsidered = 50.0
-    val constantStraightDrivingThreshold = 0.05
-
-    var sensorInformation = SensorInformation(noisySensors, sensorAngles.size)
+    var distanceRaced = 0.0
+    var speedReachedMax = 0.0
+    var lengthDrivenStraight = 0.0
+    var tooLowTurnSpeed = 0.0
+    var ticksInOrBeforeTurns = 0
 
 
     fun setController(controller: CarController) {
@@ -139,6 +152,50 @@ class Car(private val race: Race, noisySensors: Boolean) {
         }
     }
 
+    private fun updateFitnessRelatedInformation(dt: Double, targetSteer: Double) {
+        // Fitness: Turn speed score.
+        if (currentSegment != null) {
+            val carIsInTurnOrApproaching: Boolean
+
+            val possibleSpeed = if (currentSegment!!.inTurn != null) {
+                // The car is currently in a turn.
+
+                carIsInTurnOrApproaching = true
+                currentSegment!!.inTurn!!.maxSpeed
+            } else {
+                val nextTurn = currentSegment!!.nextTurn!!
+
+                if (nextTurn.maxSpeed >= sensorInformation.maxSpeed) {
+                    // The car is on a straight or the next turn is close to straight.
+                    carIsInTurnOrApproaching = false
+                    sensorInformation.maxSpeed
+                } else {
+                    // The next turn is a real "turn". Determine the distance to it.
+                    val distance = min(
+                        TURN_SPEED_DISTANCE_MAX, if (nextTurn.segments.first().id < currentSegment!!.id)
+                            track.length - (currentSegment!!.totalTrackLength + sensorInformation.segmentPosition) + nextTurn.segments.first().totalTrackLength
+                        else nextTurn.segments.first().totalTrackLength - (currentSegment!!.totalTrackLength + sensorInformation.segmentPosition)
+                    )
+
+                    carIsInTurnOrApproaching = distance < TURN_SPEED_DISTANCE_MAX
+
+                    // Reduce the approx. max. speed linearly in relation to the distance to the turn.
+                    nextTurn.maxSpeed + (sensorInformation.maxSpeed - nextTurn.maxSpeed) * (distance / TURN_SPEED_DISTANCE_MAX)
+                }
+            } * TURN_SPEED_MULTIPLIER
+
+            if (carIsInTurnOrApproaching) {
+                // Update the fitness value. Note: A speed higher than possibleSpeed contributes positively to the fitness value.
+                tooLowTurnSpeed += possibleSpeed - absoluteVelocity
+                ticksInOrBeforeTurns++
+            }
+        }
+
+        if (abs(targetSteer) <= THRESHOLD_DRIVING_STRAIGHT) {
+            lengthDrivenStraight += absoluteVelocity * dt
+        }
+    }
+
 
     fun update(dt: Double) {
         sensorInformation = updateGameState()
@@ -146,61 +203,24 @@ class Car(private val race: Race, noisySensors: Boolean) {
         val input = controller!!.control(sensorInformation)
         val targetSteer = input.left - input.right
 
-        if (currentSegment != null) {
-            val countsToFitness: Boolean
-
-            val possibleSpeed = if (currentSegment!!.inTurn != null) {
-                countsToFitness = true
-                currentSegment!!.inTurn!!.maxSpeed
-            } else {
-                val nextTurn = currentSegment!!.nextTurn!!
-
-                if (nextTurn.maxSpeed >= sensorInformation.maxSpeed) {
-                    countsToFitness = false
-                    sensorInformation.maxSpeed
-                } else {
-                    val distance = min(
-                        constantTurnDistanceConsidered, if (nextTurn.segments.first().id < currentSegment!!.id)
-                            track.length - (currentSegment!!.totalTrackLength + sensorInformation.segmentPosition) + nextTurn.segments.first().totalTrackLength
-                        else nextTurn.segments.first().totalTrackLength - (currentSegment!!.totalTrackLength + sensorInformation.segmentPosition)
-                    )
-
-                    countsToFitness = distance < constantTurnDistanceConsidered
-
-                    nextTurn.maxSpeed + (sensorInformation.maxSpeed - nextTurn.maxSpeed) * (distance / constantTurnDistanceConsidered)
-                }
-            } * constantTurnSpeed
-
-            if (countsToFitness) {
-                tooLowTurnSpeed += possibleSpeed - absVel
-                ticksInOrBeforeTurns++
-            }
-        }
-
-        if (abs(targetSteer) <= constantStraightDrivingThreshold) {
-            lengthDrivenStraight += absVel * dt
-        }
+        updateFitnessRelatedInformation(dt, targetSteer)
 
         throttle = input.throttle
         brake = filterABS(input.brake)
-        steerAngle = targetSteer * maxSteer
+        steerAngle = targetSteer * STEER_MAX
 
-        doPhysics(dt)
+        updatePhysics(dt)
     }
-
-    var lengthDrivenStraight = 0.0
-    var tooLowTurnSpeed = 0.0
-    var ticksInOrBeforeTurns = 0
 
 
     /**
      * Determines the track segment, the car is currently located on.
      */
     private fun findCurrentSegment(): Segment? {
-        if (wasOffTrack) return null
-        indicesToConsider = determineIndicesToConsider(-1, 3)
+        if (disqualified) return null
+        val segmentsToConsider = determineIndicesToConsider(-1, 3)
 
-        for (segmentIndex in indicesToConsider) {
+        for (segmentIndex in segmentsToConsider) {
             val segment = track.segments[segmentIndex]
             if (GeometryUtils.isWithin(segment, position)) {
                 return segment
@@ -242,7 +262,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
      */
     private fun updateTrackEdgeSensors(): Array<Double> {
         // The car is disqualified.
-        if (wasOffTrack) return Array(0) { 0.0 }
+        if (disqualified) return Array(0) { 0.0 }
 
         sensors = updateSensorTargetVectors()
 
@@ -303,6 +323,9 @@ class Car(private val race: Race, noisySensors: Boolean) {
     }
 
 
+    /**
+     * The fitness functions described in my dissertation.
+     */
     fun getFitness(): Array<Double> {
         /*
         Successful,if
@@ -310,24 +333,26 @@ class Car(private val race: Race, noisySensors: Boolean) {
         f2 <= 0.1 -- in 90 % of all measured points, speed lies at 0.95 x max measured turn speed of more
         f3 <= 0.15 -- more than 85 % of the total straight length of the track are driven with only minor steering wheel movements
          */
-        val metersPerTickAt180KMH = (180.0 / 3.6) * race.dt
+
+        // Define the required constants:
+        val metersPerTickAt180KMH = (180.0 / 3.6) * Race.DT
         val distanceAt180KMH = metersPerTickAt180KMH * race.tMax.toDouble()
         val distanceOnStraightsAt180KMH = distanceAt180KMH * (race.track.straightLength / race.track.length)
 
         val fDistance = 1.0 - min(1.0, distanceRaced / distanceAt180KMH)
-        val fCurveSpeed = if (ticksInOrBeforeTurns == 0) 1.0 else
-            max(0.0, min(1.0, tooLowTurnSpeed / (ticksInOrBeforeTurns.toDouble() * race.fps.toDouble())))
+        val fTurnSpeed = if (ticksInOrBeforeTurns == 0) 1.0 else
+            max(0.0, min(1.0, tooLowTurnSpeed / (ticksInOrBeforeTurns.toDouble() * Race.FPS.toDouble())))
 
-        val fStraight = 1.0 - min(1.0, lengthDrivenStraight / distanceOnStraightsAt180KMH)
+        val fDrivingStraight = 1.0 - min(1.0, lengthDrivenStraight / distanceOnStraightsAt180KMH)
 
 
 
-        return arrayOf(fDistance, fCurveSpeed, fStraight)
+        return arrayOf(fDistance, fTurnSpeed, fDrivingStraight)
     }
 
 
-    fun updateGameState(): SensorInformation {
-        sensorInformation.absVel = absVel
+    private fun updateGameState(): SensorInformation {
+        sensorInformation.absoluteVelocity = absoluteVelocity
 
         currentSegment = findCurrentSegment()
 
@@ -338,28 +363,31 @@ class Car(private val race: Race, noisySensors: Boolean) {
             if (previousSegment != currentSegment) {
                 if (previousSegment == null) {
                     // First update. Or after loosing track.
-                    visitedSegments = 0
+//                    visitedSegments = 0
                 } else {
                     if (previousSegment!!.id == track.segments[track.segments.size - 1].id && currentSegment!!.id == 0) {
                         // Finished round.
                         sensorInformation.roundsFinished++
 
-                        visitedSegments++
+//                        visitedSegments++
                     } else {
                         val segmentDiff = currentSegment!!.id - previousSegment!!.id
-                        when {
-                            segmentDiff < 0 -> {
-                                // The car is driving backwards. Disqualify it.
-                                disqualified = true
-                            }
-                            segmentDiff <= 3 -> {
-                                // Entering subsequent segment.
-                                visitedSegments++
-                            }
-                            else -> {
-                                visitedSegments = 0
-                            }
-                        }
+
+                        if (segmentDiff < 0) disqualified = true // The car is driving backwards. Disqualify it.
+
+//                        when {
+//                            segmentDiff < 0 -> {
+//                                // The car is driving backwards. Disqualify it.
+//                                disqualified = true
+//                            }
+//                            segmentDiff <= 3 -> {
+//                                // Entering subsequent segment.
+//                                visitedSegments++
+//                            }
+//                            else -> {
+//                                visitedSegments = 0
+//                            }
+//                        }
                     }
                 }
 
@@ -377,9 +405,9 @@ class Car(private val race: Race, noisySensors: Boolean) {
             if (sensorInformation.angleToTrackAxis > PI) sensorInformation.angleToTrackAxis -= 2.0 * PI
 
             // Update Sensors: Angle to segment ideal line. Attention: Has to be determined in advance.
-            sensorInformation.angleToTrackIdeal = segment.idealAngle - heading
-            if (sensorInformation.angleToTrackIdeal < -PI) sensorInformation.angleToTrackIdeal += 2.0 * PI
-            if (sensorInformation.angleToTrackIdeal > PI) sensorInformation.angleToTrackIdeal -= 2.0 * PI
+//            sensorInformation.angleToTrackIdeal = segment.idealAngle - heading
+//            if (sensorInformation.angleToTrackIdeal < -PI) sensorInformation.angleToTrackIdeal += 2.0 * PI
+//            if (sensorInformation.angleToTrackIdeal > PI) sensorInformation.angleToTrackIdeal -= 2.0 * PI
 
 
             val detAxis = sign(
@@ -387,7 +415,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
                         (segment.centreEnd.y - segment.centreStart.y) * (position.x - segment.centreStart.x)
             ).toInt()
 
-            val pAxis = (if (detAxis == 0) position else GeometryUtils.adjPoint(position, segment.axis))!!
+            val pAxis = (if (detAxis == 0) position else GeometryUtils.adjPoint(position, segment.axis))
             // Update Sensors: Current position concerning track length.
             sensorInformation.segmentPosition = segment.centreStart.distance(pAxis)
 
@@ -403,20 +431,20 @@ class Car(private val race: Race, noisySensors: Boolean) {
             }
 
             // Same for ideal line.
-            val detIdeal =
-                sign((segment.idealEnd.x - segment.idealStart.x) * (position.y - segment.idealStart.y) - (segment.idealEnd.y - segment.idealStart.y) * (position.x - segment.idealStart.x)).toInt()
-            val pIdeal = (if (detIdeal == 0) position else GeometryUtils.adjPoint(position, segment.ideal))!!
-
-
-            sensorInformation.distanceToTrackIdeal = if (detIdeal != 0) {
-                sign(detIdeal.toDouble()) * position.distance(pIdeal) / (widthAtPoint * 0.5)
-            } else {
-                0.0
-            }
+//            val detIdeal =
+//                sign((segment.idealEnd.x - segment.idealStart.x) * (position.y - segment.idealStart.y) - (segment.idealEnd.y - segment.idealStart.y) * (position.x - segment.idealStart.x)).toInt()
+//            val pIdeal = (if (detIdeal == 0) position else GeometryUtils.adjPoint(position, segment.ideal))!!
+//
+//
+//            sensorInformation.distanceToTrackIdeal = if (detIdeal != 0) {
+//                sign(detIdeal.toDouble()) * position.distance(pIdeal) / (widthAtPoint * 0.5)
+//            } else {
+//                0.0
+//            }
 
         } else {
             // The car has left the track. Disqualify it.
-            wasOffTrack = true
+//            wasOffTrack = true
             disqualified = true
         }
 
@@ -424,18 +452,16 @@ class Car(private val race: Race, noisySensors: Boolean) {
             totalDistanceFromTrack += abs(sensorInformation.distanceToTrackAxis)
         }
 
-        if (abs(sensorInformation.distanceToTrackIdeal) > 0.1) {
-            totalDistanceToIdeal += abs(sensorInformation.distanceToTrackIdeal)
-        }
+//        if (abs(sensorInformation.distanceToTrackIdeal) > 0.1) {
+//            totalDistanceToIdeal += abs(sensorInformation.distanceToTrackIdeal)
+//        }
 
 
         if (!disqualified) {
-            totalSpeed += absVel
+            totalSpeed += absoluteVelocity
 
-            if (absVel > speedReachedMax) speedReachedMax = absVel
+            if (absoluteVelocity > speedReachedMax) speedReachedMax = absoluteVelocity
         }
-
-        currentStep++
 
         sensorInformation.finish()
 
@@ -443,42 +469,53 @@ class Car(private val race: Race, noisySensors: Boolean) {
     }
 
 
+    var velocity = Vector2()
+    var velocityLocal = Vector2()
+    var acceleration = Vector2()
+    var accelerationLocal = Vector2()
+    var absoluteVelocity = 0.0
+    var yawRate = 0.0
+
+
     /**
      * Car physics.
      */
-    private fun doPhysics(dt: Double) {
+    private fun updatePhysics(dt: Double) {
         val sn = sin(heading)
         val cs = cos(heading)
 
         // Get velocity in local car coordinates
-        velocity_c.x = cs * velocity.x + sn * velocity.y;
-        velocity_c.y = cs * velocity.y - sn * velocity.x;
+        velocityLocal.x = cs * velocity.x + sn * velocity.y;
+        velocityLocal.y = cs * velocity.y - sn * velocity.x;
 
         // Weight on axles based on centre of gravity and weight shift due to forward/reverse acceleration
         val axleWeightFront =
-            mass * (axleWeightRatioFront * gravity - weightTransfer * accel_c.x * cgHeight / wheelBase);
-        val axleWeightRear = mass * (axleWeightRatioRear * gravity + weightTransfer * accel_c.x * cgHeight / wheelBase);
+            PHYSICS_MASS * (PHYSICS_AXLE_WEIGHT_RATIO_FRONT * PHYSICS_GRAVITY - PHYSICS_WEIGHT_TRANSFER * accelerationLocal.x * PHYSICS_CG_HEIGHT / PHYSICS_WHEEL_BASE);
+        val axleWeightRear =
+            PHYSICS_MASS * (PHYSICS_AXLE_WEIGHT_RATIO_REAR * PHYSICS_GRAVITY + PHYSICS_WEIGHT_TRANSFER * accelerationLocal.x * PHYSICS_CG_HEIGHT / PHYSICS_WHEEL_BASE);
 
         // Resulting velocity of the wheels as result of the yaw rate of the car body.
         // v = yawrate * r where r is distance from axle to CG and yawRate (angular velocity) in rad/s.
-        val yawSpeedFront = cgToFrontAxle * this.yawRate;
-        val yawSpeedRear = -cgToRearAxle * this.yawRate;
+        val yawSpeedFront = PHYSICS_CG_TO_FRONT_AXLE * this.yawRate;
+        val yawSpeedRear = -PHYSICS_CG_TO_REAR_AXLE * this.yawRate;
 
         // Calculate slip angles for front and rear wheels (a.k.a. alpha)
-        val slipAngleFront = atan2(velocity_c.y + yawSpeedFront, abs(velocity_c.x)) - sign(velocity_c.x) * steerAngle;
-        val slipAngleRear = atan2(velocity_c.y + yawSpeedRear, abs(velocity_c.x));
+        val slipAngleFront =
+            atan2(velocityLocal.y + yawSpeedFront, abs(velocityLocal.x)) - sign(velocityLocal.x) * steerAngle;
+        val slipAngleRear = atan2(velocityLocal.y + yawSpeedRear, abs(velocityLocal.x));
 
-        val tireGripFront = tireGrip;
-        val tireGripRear = tireGrip //* (1.0 - inputs.ebrake * (1.0 - lockGrip)); // reduce rear grip when ebrake is on
+        val tireGripFront = PHYSICS_TIRE_GRIP;
+        val tireGripRear =
+            PHYSICS_TIRE_GRIP //* (1.0 - inputs.ebrake * (1.0 - lockGrip)); // reduce rear grip when ebrake is on
 
         val frictionForceFront_cy =
-            clamp(-cornerStiffnessFront * slipAngleFront, -tireGripFront, tireGripFront) * axleWeightFront;
+            clamp(-PHYSICS_CORNER_STIFFNESS_FRONT * slipAngleFront, -tireGripFront, tireGripFront) * axleWeightFront;
         val frictionForceRear_cy =
-            clamp(-cornerStiffnessRear * slipAngleRear, -tireGripRear, tireGripRear) * axleWeightRear;
+            clamp(-PHYSICS_CORNER_STIFFNESS_REAR * slipAngleRear, -tireGripRear, tireGripRear) * axleWeightRear;
 
         //  Get amount of brake/throttle from our inputs
-        val brake = this.brake * brakeForce
-        val throttle = this.throttle * engineForce
+        val brake = this.brake * PHYSICS_BRAKE_FORCE
+        val throttle = this.throttle * PHYSICS_ENGINE_FORCE
 
 /*
 ONLY BASIC PHYSICS MODEL. Important to tune those constants:
@@ -491,11 +528,13 @@ ONLY BASIC PHYSICS MODEL. Important to tune those constants:
 
         //  Resulting force in local car coordinates.
         //  This is implemented as a RWD car only.
-        val tractionForce_cx = throttle - brake * sign(velocity_c.x)
+        val tractionForce_cx = throttle - brake * sign(velocityLocal.x)
         val tractionForce_cy = 0.0;
 
-        val dragForce_cx = -rollResist * velocity_c.x - airResist * velocity_c.x * abs(velocity_c.x)
-        val dragForce_cy = -rollResist * velocity_c.y - airResist * velocity_c.y * abs(velocity_c.y)
+        val dragForce_cx =
+            -PHYSICS_ROLL_RESIST * velocityLocal.x - PHYSICS_AIR_RESIST * velocityLocal.x * abs(velocityLocal.x)
+        val dragForce_cy =
+            -PHYSICS_ROLL_RESIST * velocityLocal.y - PHYSICS_AIR_RESIST * velocityLocal.y * abs(velocityLocal.y)
 
         // total force in car coordinates
         val totalForce_cx = dragForce_cx + tractionForce_cx;
@@ -503,34 +542,34 @@ ONLY BASIC PHYSICS MODEL. Important to tune those constants:
             dragForce_cy + tractionForce_cy + cos(steerAngle) * frictionForceFront_cy + frictionForceRear_cy;
 
         // acceleration along car axes
-        accel_c.x = totalForce_cx / mass;  // forward/reverse accel
-        accel_c.y = totalForce_cy / mass;  // sideways accel
+        accelerationLocal.x = totalForce_cx / PHYSICS_MASS;  // forward/reverse accel
+        accelerationLocal.y = totalForce_cy / PHYSICS_MASS;  // sideways accel
 
         // acceleration in world coordinates
-        accel.x = cs * accel_c.x - sn * accel_c.y;
-        accel.y = sn * accel_c.x + cs * accel_c.y;
+        acceleration.x = cs * accelerationLocal.x - sn * accelerationLocal.y;
+        acceleration.y = sn * accelerationLocal.x + cs * accelerationLocal.y;
 
         // update velocity
-        velocity.x += accel.x * dt;
-        velocity.y += accel.y * dt;
+        velocity.x += acceleration.x * dt;
+        velocity.y += acceleration.y * dt;
 
-        absVel = velocity.magn()
+        absoluteVelocity = velocity.magn()
 
 
         // calculate rotational forces
         var angularTorque =
-            (frictionForceFront_cy + tractionForce_cy) * cgToFrontAxle - frictionForceRear_cy * cgToRearAxle;
+            (frictionForceFront_cy + tractionForce_cy) * PHYSICS_CG_TO_FRONT_AXLE - frictionForceRear_cy * PHYSICS_CG_TO_REAR_AXLE;
 
         //  Sim gets unstable at very slow speeds, so just stop the car
-        if (abs(absVel) < 0.5 && throttle == 0.0) {
+        if (abs(absoluteVelocity) < 0.5 && throttle == 0.0) {
             velocity.x = 0.0
             velocity.y = 0.0
-            absVel = 0.0
+            absoluteVelocity = 0.0
             angularTorque = 0.0
             yawRate = 0.0
         }
 
-        val angularAccel = angularTorque / this.inertia
+        val angularAccel = angularTorque / PHYSICS_INERTIA
 
         yawRate += angularAccel * dt;
         heading += yawRate * dt;
@@ -539,7 +578,7 @@ ONLY BASIC PHYSICS MODEL. Important to tune those constants:
         position.x += velocity.x * dt;
         position.y += velocity.y * dt;
 
-        totalVel += absVel * dt
+        totalVel += absoluteVelocity * dt
     }
 
     var totalVel = 0.0
@@ -550,7 +589,7 @@ ONLY BASIC PHYSICS MODEL. Important to tune those constants:
 
 
     /**
-     * A naive approach on Anti-lock braking system.
+     * A naive approach on an Anti-lock braking system.
      */
 
     var lastBrakeLoosened = true

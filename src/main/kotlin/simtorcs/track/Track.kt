@@ -2,65 +2,85 @@ package simtorcs.track
 
 import de.stevenkuenzel.util.PathUtil
 import de.stevenkuenzel.xml.XElement
-import simtorcs.car.Car
 import simtorcs.car.control.TestController
 import simtorcs.race.Race
-import simtorcs.visualization.RaceAWTComponent
 import simtorcs.geometry.Vector2
-import javax.swing.JFrame
 import kotlin.math.PI
 import kotlin.math.abs
 
-class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
+class Track(private val levelOfDetail: Int = 1, private val name: String = "") {
 
     companion object {
+        /**
+         * Imports the TORCS track with the given name and level of detail.
+         */
         fun load(name: String, levelOfDetail: Int): Track {
             val invert = name.startsWith("!")
-            val t = Track(0, levelOfDetail, name)
+            val t = Track(levelOfDetail, name)
 
-            t.import((if (invert) name.substring(1) else name).toLowerCase(), invert)
+            t.importFromTORCS((if (invert) name.substring(1) else name).toLowerCase(), invert)
             t.finalize()
 
             return t
         }
+
+        const val MIN_TURN_SPEED = 5.0
+        const val MAX_TURN_SEGMENT_LENGTH_SQR = 2500.0
     }
 
-
-    val segments = mutableListOf<Segment>()
-
     val minTurnRad = 0.1 / levelOfDetail.toDouble()
-    val maxCurveSegmentLengthSqr = 2500.0
     var startWidth = 13.0
 
+    val segments = mutableListOf<Segment>()
     var prevSegment: CoordinateSegment? = null
+    var nextSegmentID = 0
+
+    // The location where a new racing car is spawned, including its heading.
+    var startingPoint = Vector2()
+    var startingDirection = 0.0
+
+    val turns = mutableListOf<Turn>()
+
+    /**
+     * Total length of the track.
+     */
+    var length = 0.0
+
+    /**
+     * Length of the straight segments of the track.
+     */
+    var straightLength = 0.0
 
 
+    // Values concerning drawing the track on the screen.
     var xMin = Double.MAX_VALUE
     var xMax = Double.NEGATIVE_INFINITY
     var yMin = Double.MAX_VALUE
     var yMax = Double.NEGATIVE_INFINITY
 
 
-    var nextSegmentID = 0
-
-    val turns = mutableListOf<Turn>()
-
+    /**
+     * Adds a turn to the track, composed of two half turns with radii radiusStart and radiusEnd.
+     */
     fun addTurn(angleInRad: Double, radiusStart: Double, radiusEnd: Double) {
         val angHalf = angleInRad / 2.0
-        val l1 = radiusStart * abs(angHalf)
-        val l2 = radiusEnd * abs(angHalf)
+        val segmentLength1 = radiusStart * abs(angHalf)
+        val segmentLength2 = radiusEnd * abs(angHalf)
 
         // First half.
         for (i in 0 until levelOfDetail) {
-            addSegment(l1 / levelOfDetail.toDouble(), startWidth, angHalf / levelOfDetail.toDouble())
+            addSegment(segmentLength1 / levelOfDetail.toDouble(), startWidth, angHalf / levelOfDetail.toDouble())
         }
 
         // Second half.
         for (i in 0 until levelOfDetail) {
-            addSegment(l2 / levelOfDetail.toDouble(), startWidth, angHalf / levelOfDetail.toDouble())
+            addSegment(segmentLength2 / levelOfDetail.toDouble(), startWidth, angHalf / levelOfDetail.toDouble())
         }
     }
 
+    /**
+     * Adds a straight segment with a certain rotation w.r.t. the previous segment. The interface between the two segments is covered by an EdgeSegment.
+     */
     fun addSegment(length: Double, width: Double, angle: Double) {
         val newSegment = CoordinateSegment(length, width, angle, prevSegment, this)
 
@@ -68,23 +88,22 @@ class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
 
         if (edgeSegment != null) {
             edgeSegment.id = nextSegmentID++
-            checkMinMaxOfSegment(edgeSegment)
+            determineMinAndMaxXYValues(edgeSegment)
             segments.add(edgeSegment)
         }
 
         newSegment.id = nextSegmentID++
 
-        checkMinMaxOfSegment(newSegment)
+        determineMinAndMaxXYValues(newSegment)
         segments.add(newSegment)
 
         prevSegment = newSegment
     }
 
-    fun addSegment(length: Int, width: Int, angle: Int) {
-        addSegment(length.toDouble(), width.toDouble(), angle.toDouble() / (180.0 / PI))
-    }
-
-    fun checkMinMaxOfSegment(segment: Segment) {
+    /**
+     * Determines the global min. and max. x- and y-values of the track. Required for drawing the track on the screen.
+     */
+    private fun determineMinAndMaxXYValues(segment: Segment) {
         val segmentMinMax = segment.getXYMinMax()
 
         val min = segmentMinMax.first
@@ -97,43 +116,25 @@ class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
     }
 
 
-    var length = 0.0
-    var straightLength = 0.0
-
-    var startingPoint = Vector2()
-    var startingDirection = 0.0
-
+    /**
+     * Creates the last track segment, i.e. a connection between the last and the first segment. Determines relevant meta information about the track.
+     */
     fun finalize() {
+        // Add the connecting segment.
         val firstSegment = segments[0]
         val lastSegment = segments[segments.size - 1]
-
-//        val point1 = Segment.getWeightedCentre(firstSegment.p1, lastSegment.p3, 0.5)
-//        val point2 = Segment.getWeightedCentre(firstSegment.p2, lastSegment.p4,0.5)
-//
-//        firstSegment.p1 = point1
-//        firstSegment.p2 = point2
-//        lastSegment.p3 = point1
-//        lastSegment.p4 = point2
-//
-//        firstSegment.updateSegmentLines()
-//        firstSegment.updateCentres()
-//        lastSegment.updateSegmentLines()
-//        lastSegment.updateCentres()
-//
 
         val connectingSegment = ConnectingSegment(lastSegment, firstSegment, this)
         connectingSegment.id = nextSegmentID++
 
         segments.add(connectingSegment)
 
-
+        // Determine further track information.
         startingPoint = Segment.getWeightedCentre(firstSegment.centreStart, firstSegment.centreEnd, 0.9)
         startingDirection = firstSegment.segmentAngle
 
         findTurnSegments()
         findMaxTurnSpeeds()
-
-//        showTrack()
 
         for (segment in segments) {
             segment.totalTrackLength = length
@@ -144,122 +145,52 @@ class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
         }
     }
 
-    fun findMaxTurnSpeeds() {
-        val visualize = false
-        val iniSpeed = 92.0 // ~ 330.0 / 3.6
-        var nextTurnToFind = 0
-
-
-        var turn = turns[nextTurnToFind]
-        var turnOK: Boolean
-        var speed = iniSpeed
-
-
-        while (true) {
-            val r = Race(this)
-            val c = Car(r, false)
-            r.cars.add(c)
-            c.setController(TestController(speed))
-
-            val firstSegmentID = turn.segments.first().id
-
-            val prevSegment = segments[if (firstSegmentID > 0) firstSegmentID - 1 else segments.size - 1]
-            c.currentSegment = prevSegment
-            c.position =
-                prevSegment.centreStart.addNew(prevSegment.centreEnd.subtract(prevSegment.centreStart).multiply(0.1))
-            c.heading = prevSegment.segmentAngle
-
-            val hv = Vector2.fromAngleInRad(c.heading)
-            c.velocity = Vector2(hv.x * speed, hv.y * speed)
-
-            val myFrame: JFrame? = if (visualize) JFrame("RACE") else null
-            if (myFrame != null) {
-                myFrame.add(RaceAWTComponent(r, 850))
-                myFrame.setSize(900, 900)
-                myFrame.setVisible(true)
-            }
-
-
-
-            while (r.tNow < r.tMax && !r.raceFinished) {
-                r.update()
-
-                if (c.disqualified) break
-                if (c.lastValidSegment!!.id > turn.segments.last().id) break
-
-                if (myFrame != null) {
-                    myFrame.repaint()
-                    Thread.sleep((1000.0 / (r.fps * 10).toDouble()).toLong())
-                }
-            }
-
-            myFrame?.dispose()
-
-            turnOK = c.lastValidSegment!!.id > turn.segments.last().id
-
-            if (turnOK) {
-                turn.maxSpeed = speed
-                if (++nextTurnToFind == turns.size) break
-
-                turn = turns[nextTurnToFind]
-                speed = iniSpeed
-            } else {
-                speed -= 0.5
-            }
-
-            if (speed < 0.5) {
-                turn.maxSpeed = 5.0 // TODO. Arbitrary Default Value.
-                break
-            }
-        }
-    }
-
-    fun showTrack() {
-        val r = Race(this)
-        val c = Car(r, false)
-        r.cars.add(c)
-        c.setController(TestController(50.0))
-
-        val myFrame = JFrame("Track: $name")
-        myFrame.add(RaceAWTComponent(r, 850))
-        myFrame.setSize(900, 900)
-        myFrame.setVisible(true)
-        r.update()
-        myFrame.repaint()
-    }
-
-    fun findTurnSegments() {
+    /**
+     * Determines the track segments that belong to turns.
+     */
+    private fun findTurnSegments() {
         var currentTurn: Turn? = null
 
-        var nextID = 0
+        var nextTurnID = 0
 
         for (segment in segments) {
+            // Do only consider "ordinary" segments:
             if (segment is CoordinateSegment) {
-                if (segment.turn != TurnDirection.None && abs(segment.turnAngle) >= minTurnRad && segment.measuredLength <= maxCurveSegmentLengthSqr) {
+                // A segment is only considered as a turn, if its arc exceeds a certain threshold (depends on level of detail) and its length is shorter than MAX_TURN_SEGMENT_LENGTH_SQR.
+                if (segment.turn != TurnDirection.None && abs(segment.turnAngle) >= minTurnRad && segment.measuredLength <= MAX_TURN_SEGMENT_LENGTH_SQR) {
                     when {
                         currentTurn == null -> {
-                            currentTurn = Turn(nextID++, segment)
+                            // First segment of a new turn.
+                            currentTurn = Turn(nextTurnID++, segment)
                         }
+
                         currentTurn.direction != segment.turn -> {
+                            // The turn direction of the segment is different to the direction of the current turn. Consider the segment as the starting segment of a new turn.
                             turns.add(currentTurn.apply { finalize() })
-                            currentTurn = Turn(nextID++, segment)
+                            currentTurn = Turn(nextTurnID++, segment)
                         }
+
                         else -> {
+                            // Add the segment to the current turn.
                             currentTurn.add(segment)
                         }
                     }
                 } else if (currentTurn != null) {
+                    // End the current turn.
                     turns.add(currentTurn.apply { finalize() })
                     currentTurn = null
                 }
             } else if (segment is EdgeSegment && currentTurn != null) {
+                // Add a connecting edge segment to the current turn, if existing.
                 currentTurn.add(segment)
             }
         }
 
+        // Finalize the last turn found.
         if (currentTurn != null) turns.add(currentTurn.apply { finalize() })
 
 
+        // Assign a reference to the next turn to each segment if the track.
         for (index in segments.indices) {
             val segment = segments[index]
 
@@ -276,57 +207,82 @@ class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
             }
 
         }
-
-//        updateIdealLine() // TODO: Deactivated as with increasing LOD the ideal line computation becomes worse.
     }
 
-//    fun updateIdealLine() {
-//        val filtered = segments.filterIsInstance<CoordinateSegment>()
-//
-//        for (index in filtered.indices) {
-//            val a = filtered[index]
-//            val b = filtered[(index + 1) % filtered.size]
-//
-//            if (a.turn == TurnDirection.None && b.turn != TurnDirection.None) {
-//                a.idealEnd = b.idealStart
-//                continue
-//            }
-//
-//            if (a.turn != TurnDirection.None && b.turn == TurnDirection.None) {
-//                b.idealStart = a.idealEnd
-//                continue
-//            }
-//
-//
-//            val pt = Segment.getWeightedCentre(a.idealEnd, b.idealStart, 0.5)
-//
-//            a.idealEnd = pt
-//            b.idealStart = pt
-//        }
-//
-//        for (index in segments.indices) {
-//            val segment = segments[index]
-//
-//            if (!(segment is CoordinateSegment)) {
-//                val prev = segments[if (index > 0) index - 1 else segments.size - 1]
-//                val next = segments[(index + 1) % segments.size]
-//
-//                segment.idealStart = prev.idealEnd
-//                segment.idealEnd = next.idealStart
-//            }
-//        }
-//
-//        segments.forEach { it.updateIdeal() }
-//    }
 
+    /**
+     * Determines the maximum driving speed a turn can be taken with.
+     */
+    private fun findMaxTurnSpeeds() {
+        val iniSpeed = 92.0 // [m/s]
+        var nextTurnToFind = 0
 
-    fun import(name: String, invert: Boolean = false) {
+        var turn = turns[nextTurnToFind]
+        var turnPassed: Boolean
+        var speed = iniSpeed
+
+        while (true) {
+            // Create a new race.
+            val race = Race(this, false)
+            val car = race.createCar()
+            car.setController(TestController(speed))
+
+            // Find the first turn of the track.
+            val firstSegmentID = turn.segments.first().id
+
+            // Place the car on the previous segment of the turn segment.
+            val prevSegment = segments[if (firstSegmentID > 0) firstSegmentID - 1 else segments.size - 1]
+            car.currentSegment = prevSegment
+            car.position =
+                prevSegment.centreStart.addNew(prevSegment.centreEnd.subtract(prevSegment.centreStart).multiply(0.1))
+
+            // Set the car's heading in segment axis direction.
+            car.heading = prevSegment.segmentAngle
+
+            // "Accelerate" the car into axis direction.
+            val headingVector = Vector2.fromAngleInRad(car.heading)
+            car.velocity = Vector2(headingVector.x * speed, headingVector.y * speed)
+
+            // Update the race until the car is disqualified or has passed the turn.
+            while (race.tNow < race.tMax && !race.raceFinished) {
+                race.update()
+
+                if (car.disqualified || car.lastValidSegment!!.id > turn.segments.last().id) break
+            }
+
+            turnPassed = car.lastValidSegment!!.id > turn.segments.last().id
+
+            if (turnPassed) {
+                // Save the current speed as maximum turn speed.
+                turn.maxSpeed = speed
+                if (++nextTurnToFind == turns.size) break
+
+                turn = turns[nextTurnToFind]
+                speed = iniSpeed
+            } else {
+                // Reduce the speed and try again.
+                speed -= 0.5
+            }
+
+            // The turn could not be passed for any reason. Set a default speed.
+            if (speed < 0.5) {
+                turn.maxSpeed = MIN_TURN_SPEED
+                break
+            }
+        }
+    }
+
+    /**
+     * Load a TORCS track from an XML file.
+     */
+    fun importFromTORCS(name: String, invert: Boolean = false) {
         val xElement = XElement.load(PathUtil.inputDir + "tracks/$name.xml")!!
 
         var xMainTrack: XElement? = null
         var xTrackSegments: XElement? = null
-        var xPits: XElement? = null
+//        var xPits: XElement? = null
 
+        // Find the main section of the XML file.
         for (xSection in xElement.getChildren("section")) {
             if (xSection.getAttributeValue("name") == "Main Track") {
                 xMainTrack = xSection
@@ -336,6 +292,7 @@ class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
 
         var trackWidth = 10.0
 
+        // Determine the track width.
         for (xAttNum in xMainTrack!!.getChildren("attnum")) {
             if (xAttNum.getAttributeValue("name") == "width") {
                 trackWidth = xAttNum.getAttributeValueAsDouble("val")
@@ -347,33 +304,29 @@ class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
         startWidth = trackWidth
 
 
-        for (xSection in xMainTrack.getChildren("section")) {
-            if (xSection.getAttributeValue("name") == "Pits") {
-                xPits = xSection
-            }
-        }
+//        for (xSection in xMainTrack.getChildren("section")) {
+//            if (xSection.getAttributeValue("name") == "Pits") {
+//                xPits = xSection
+//            }
+//        }
+//        val pitNames = mutableListOf<String>()
+//
+//        for (xAttStr in xPits!!.getChildren("attstr")) {
+//            pitNames.add(xAttStr.getAttributeValue("val"))
+//        }
 
-        val pitNames = mutableListOf<String>()
-
-        for (xAttStr in xPits!!.getChildren("attstr")) {
-            pitNames.add(xAttStr.getAttributeValue("val"))
-        }
-
+        // Find the track segment section.
         for (xSection in xMainTrack.getChildren("section")) {
             if (xSection.getAttributeValue("name") == "Track Segments") {
                 xTrackSegments = xSection
             }
         }
 
-
+        // Iterate over all segments.
         for (xTrackSegment in xTrackSegments!!.getChildren("section")) {
             val map = hashMapOf<String, String>()
 
-            val segmentName = xTrackSegment.getAttributeValue("name")
-
-//            if (pitNames.contains(segmentName)) continue
-//            if (segmentName.contains("pit")) continue
-
+            // Determine the segment type: str(aight), l(eft)gt, r(ight)gt
             for (xAttStr in xTrackSegment.getChildren("attstr")) {
                 val xName = xAttStr.getAttributeValue("name")
                 val xValue = xAttStr.getAttributeValue("val")
@@ -384,6 +337,7 @@ class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
                 }
             }
 
+            // Determine the numeric properties of the segment.
             for (xAttNum in xTrackSegment.getChildren("attnum")) {
                 val xName = xAttNum.getAttributeValue("name")
                 val xValue = xAttNum.getAttributeValue("val")
@@ -400,23 +354,26 @@ class Track(val size: Int, val levelOfDetail: Int = 1, val name: String = "") {
             }
 
             if (map["type"]!! == "str") {
+                // Add a straight segment to this track instance.
 
-                val lg = map["lg"]!!.toDouble()
-                addSegment(lg, trackWidth, 0.0)
+                val length = map["lg"]!!.toDouble()
+                addSegment(length, trackWidth, 0.0)
             } else {
+                // Add a turn segment to this track instance.
+
                 val arc = map["arc"]!!.toDouble()
                 val leftTurn = map["type"]!! == "lft" // else rgt
-                val r1 = map["radius"]!!.toDouble()
-                val r2 = if (map.containsKey("end radius")) {
+                val radiusStart = map["radius"]!!.toDouble()
+                val radiusEnd = if (map.containsKey("end radius")) {
                     map["end radius"]!!.toDouble()
                 } else {
-                    r1
+                    radiusStart
                 }
 
-
+                // Determine the turn angle in [rad]. Left turns have negative sign.
                 val angleInRad = arc * (PI / 180.0) * (if (leftTurn) -1.0 else 1.0) * (if (invert) -1.0 else 1.0)
 
-                addTurn(angleInRad, r1, r2)
+                addTurn(angleInRad, radiusStart, radiusEnd)
             }
         }
     }

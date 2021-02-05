@@ -2,12 +2,12 @@ package simtorcs.geometry
 
 import kotlin.math.*
 
+/**
+ * Basic 2-d vectors.
+ */
 class Vector2(var x : Double, var y : Double) {
     companion object
     {
-        /**
-         * https://math.stackexchange.com/a/295827
-         */
         fun fromAngleInRad(angInRad : Double) : Vector2
         {
             return Vector2(cos(angInRad), sin(angInRad))
@@ -85,6 +85,7 @@ class Vector2(var x : Double, var y : Double) {
     {
         return sqrt(sqrDistance(other))
     }
+
     fun sqrDistance(other: Vector2): Double
     {
         val dX = x - other.x
@@ -104,14 +105,6 @@ class Vector2(var x : Double, var y : Double) {
     }
 
 
-
-//    /**
-//    Requires both vectors to be normalized.
-//     */
-//    fun ang(other : Vector2) : Double
-//    {
-//        return acos(dot(other))
-//    }
 
     /**
     Requires both vectors to be normalized.
