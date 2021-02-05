@@ -200,6 +200,8 @@ class Car(private val race: Race, noisySensors: Boolean) {
     fun update(dt: Double) {
         sensorInformation = updateGameState()
 
+        if (disqualified) return
+
         val input = controller!!.control(sensorInformation)
         val targetSteer = input.left - input.right
 

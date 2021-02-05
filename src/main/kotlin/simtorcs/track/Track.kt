@@ -8,7 +8,7 @@ import simtorcs.geometry.Vector2
 import kotlin.math.PI
 import kotlin.math.abs
 
-class Track(private val levelOfDetail: Int = 1, private val name: String = "") {
+class Track(val name: String = "", private val levelOfDetail: Int = 1) {
 
     companion object {
         /**
@@ -16,7 +16,7 @@ class Track(private val levelOfDetail: Int = 1, private val name: String = "") {
          */
         fun load(name: String, levelOfDetail: Int): Track {
             val invert = name.startsWith("!")
-            val t = Track(levelOfDetail, name)
+            val t = Track(name, levelOfDetail)
 
             t.importFromTORCS((if (invert) name.substring(1) else name).toLowerCase(), invert)
             t.finalize()

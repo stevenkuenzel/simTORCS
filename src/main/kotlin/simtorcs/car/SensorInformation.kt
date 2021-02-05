@@ -6,7 +6,7 @@ import kotlin.math.abs
 
 class SensorInformation(val noise : Boolean, numOfSensors : Int) {
     val random : UniformRandomProvider = RandomSource.create(RandomSource.MT)!! // Use the Mersenne Twister random number generator.
-//    val minSpeed = 50.0 / 3.6
+    val minSpeed = 50.0 / 3.6
     val maxSpeed = 330.0 / 3.6
     val sensorRange = 200.0
 
