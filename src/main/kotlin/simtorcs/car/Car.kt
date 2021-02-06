@@ -165,10 +165,10 @@ class Car(private val race: Race, noisySensors: Boolean) {
             } else {
                 val nextTurn = currentSegment!!.nextTurn!!
 
-                if (nextTurn.maxSpeed >= sensorInformation.maxSpeed) {
+                if (nextTurn.maxSpeed >= SensorInformation.SPEED_MAX) {
                     // The car is on a straight or the next turn is close to straight.
                     carIsInTurnOrApproaching = false
-                    sensorInformation.maxSpeed
+                    SensorInformation.SPEED_MAX
                 } else {
                     // The next turn is a real "turn". Determine the distance to it.
                     val distance = min(
@@ -180,7 +180,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
                     carIsInTurnOrApproaching = distance < TURN_SPEED_DISTANCE_MAX
 
                     // Reduce the approx. max. speed linearly in relation to the distance to the turn.
-                    nextTurn.maxSpeed + (sensorInformation.maxSpeed - nextTurn.maxSpeed) * (distance / TURN_SPEED_DISTANCE_MAX)
+                    nextTurn.maxSpeed + (SensorInformation.SPEED_MAX - nextTurn.maxSpeed) * (distance / TURN_SPEED_DISTANCE_MAX)
                 }
             } * TURN_SPEED_MULTIPLIER
 
@@ -272,7 +272,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
 
         for (index in sensors!!.indices) {
             val sensorLine =
-                LineSegment(position, position.addNew(sensors!![index].multiply(sensorInformation.sensorRange)))
+                LineSegment(position, position.add(sensors!![index].scale(SensorInformation.SENSOR_RANGE)))
 
             var dMin = Double.MAX_VALUE
             var found = false
@@ -281,7 +281,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
             var segmentIndex = currentSegment!!.id
 
             // Iterate over the next segments, break if the max. sensor range is exceeded
-            while (totalDistanceToSegment <= sensorInformation.sensorRange) {
+            while (totalDistanceToSegment <= SensorInformation.SENSOR_RANGE) {
                 val segment = track.segments[segmentIndex]
                 totalDistanceToSegment += segment.measuredLength
 
@@ -292,7 +292,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
                     if (intersection != null) {
                         found = true
 
-                        val distance = position.distance(intersection)
+                        val distance = position.distanceTo(intersection)
 
                         if (distance < dMin) {
                             dMin = distance
@@ -304,7 +304,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
             }
 
             // Replace the sensor value.
-            if (found) data[index] = (dMin / sensorInformation.sensorRange)
+            if (found) data[index] = (dMin / SensorInformation.SENSOR_RANGE)
         }
 
         return data
@@ -397,7 +397,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
             }
 
             // Update Sensors: Track Edge.
-            sensorInformation.sensorData = updateTrackEdgeSensors()
+            sensorInformation.trackEdgeSensors = updateTrackEdgeSensors()
 
             val segment = currentSegment!!
 
@@ -419,7 +419,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
 
             val pAxis = (if (detAxis == 0) position else GeometryUtils.adjPoint(position, segment.axis))
             // Update Sensors: Current position concerning track length.
-            sensorInformation.segmentPosition = segment.centreStart.distance(pAxis)
+            sensorInformation.segmentPosition = segment.centreStart.distanceTo(pAxis)
 
             // Determine the relative position on the track and its width at that position.
             val ratio = sensorInformation.segmentPosition / segment.measuredLength
@@ -427,7 +427,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
 
             // Update Sensors: Distance to the center axis of the track.
             sensorInformation.distanceToTrackAxis = if (detAxis != 0) {
-                sign(detAxis.toDouble()) * position.distance(pAxis) / (widthAtPoint * 0.5)
+                sign(detAxis.toDouble()) * position.distanceTo(pAxis) / (widthAtPoint * 0.5)
             } else {
                 0.0
             }
@@ -465,7 +465,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
             if (absoluteVelocity > speedReachedMax) speedReachedMax = absoluteVelocity
         }
 
-        sensorInformation.finish()
+        sensorInformation.perturbIfNecessary()
 
         return sensorInformation
     }
@@ -555,7 +555,7 @@ ONLY BASIC PHYSICS MODEL. Important to tune those constants:
         velocity.x += acceleration.x * dt;
         velocity.y += acceleration.y * dt;
 
-        absoluteVelocity = velocity.magn()
+        absoluteVelocity = velocity.magnitude()
 
 
         // calculate rotational forces

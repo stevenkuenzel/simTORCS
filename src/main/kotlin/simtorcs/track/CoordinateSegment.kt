@@ -28,7 +28,7 @@ class CoordinateSegment(private val length: Double, private val endWidth: Double
             val to = if (turn == TurnDirection.Right) p2 else p1
             val vec = to.subtract(from)
 
-            val rotVec = from.addNew(vec.rotate(turnAngle))
+            val rotVec = from.add(vec.rotate(turnAngle))
 
             // Set the rotated point as one of the starting points.
             if (turn == TurnDirection.Right) {
@@ -40,11 +40,11 @@ class CoordinateSegment(private val length: Double, private val endWidth: Double
 
         // Determine the global segment direction and a rotated vector accordingly.
         val directionInRad = (previous?.segmentAngle ?: 0.0) + turnAngle
-        val directionWithLength = Vector2.fromAngleInRad(directionInRad).multiply(length, length)
+        val directionWithLength = Vector2.fromAngleInRad(directionInRad).scale(length)
 
         // Determine the rotated end points of the segment.
-        p3 = p1.addNew(directionWithLength)
-        p4 = p2.addNew(directionWithLength)
+        p3 = p1.add(directionWithLength)
+        p4 = p2.add(directionWithLength)
 
         val widthRelation = endWidth / startWidth
 
@@ -55,13 +55,13 @@ class CoordinateSegment(private val length: Double, private val endWidth: Double
 
             val direction = p4.subtract(p3)
 
-            direction.mult(each)
+            direction.selfScale(each)
 
 
-            p3 = p3.addNew(direction)
+            p3 = p3.add(direction)
 
-            direction.mult(-1.0)
-            p4 = p4.addNew(direction)
+            direction.selfScale(-1.0)
+            p4 = p4.add(direction)
         }
         else if (widthRelation > 1.0)
         {
@@ -69,13 +69,13 @@ class CoordinateSegment(private val length: Double, private val endWidth: Double
 
             val direction = p4.subtract(p3)
 
-            direction.mult(each)
+            direction.selfScale(each)
 
 
-            p4 = p4.addNew(direction)
+            p4 = p4.add(direction)
 
-            direction.mult(-1.0)
-            p3 = p3.addNew(direction)
+            direction.selfScale(-1.0)
+            p3 = p3.add(direction)
         }
 
         // Update the segment and center lines.

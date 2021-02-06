@@ -4,50 +4,71 @@ import org.apache.commons.rng.UniformRandomProvider
 import org.apache.commons.rng.simple.RandomSource
 import kotlin.math.abs
 
-class SensorInformation(val noise : Boolean, numOfSensors : Int) {
-    val random : UniformRandomProvider = RandomSource.create(RandomSource.MT)!! // Use the Mersenne Twister random number generator.
-    val minSpeed = 50.0 / 3.6
-    val maxSpeed = 330.0 / 3.6
-    val sensorRange = 200.0
+class SensorInformation(val noise: Boolean, numOfSensors: Int) {
+    companion object {
+        // Maximum and minimum speed considered.
+        val SPEED_MIN = 50.0 / 3.6 // in [m/s]
 
-    var angleToTrackAxis = 0.0
-//    var angleToTrackIdeal = 0.0
+        /**
+         * The maximum speed of the car. Based on the approx. max. speed of car1-trb1 in TORCS.
+         */
+        val SPEED_MAX = 330.0 / 3.6 // in [m/s]
+
+        /**
+         * The maximum range covered by the track edge sensors.
+         */
+        val SENSOR_RANGE = 200.0 // in [m]eters.
+
+        /**
+         * The maximum deviation of the track edge sensor values in percent.
+         */
+        val MAX_RANDOM_DEVIATION = 0.05
+    }
+
+    /**
+     * Use the Mersenne Twister random number generator.
+     */
+    private val random by lazy { RandomSource.create(RandomSource.MT)!! }
 
     var roundsFinished = 0
     var segmentPosition = 0.0
 
-    var distanceToTrackAxis = 0.0
-//    var distanceToTrackIdeal = 0.0
+    /**
+     * Equivalent in TORCS SCR: angle.
+     */
+    var angleToTrackAxis = 0.0
 
+    /**
+     * Equivalent in TORCS SCR: trackPos.
+     */
+    var distanceToTrackAxis = 0.0
+
+    /**
+     * Equivalent in TORCS SCR: speed.
+     */
     var absoluteVelocity = 0.0
 
-    var sensorData = Array(numOfSensors) {0.0}
+    /**
+     * Equivalent in TORCS SCR: track.
+     */
+    var trackEdgeSensors = Array(numOfSensors) { 0.0 }
 
-    fun finish()
-    {
-        if (noise)
-        {
-            perturb()
-        }
-    }
+    fun perturbIfNecessary() {
+        if (noise) {
+//            var totalPerturbation = 0.0
 
-    fun perturb()
-    {
-        val maxDeviation = 0.05
+            for (index in trackEdgeSensors.indices) {
+                val actualValue = trackEdgeSensors[index]
 
-        var totalPerturbation = 0.0
+                var perturbedValue = actualValue + MAX_RANDOM_DEVIATION * (random.nextDouble() - 0.5) * 2.0
 
-        for (index in sensorData.indices) {
-            val actualValue = sensorData[index]
+                if (perturbedValue > 1.0) perturbedValue = 1.0
+                if (perturbedValue < 0.0) perturbedValue = 0.0
 
-            var perturbedValue = actualValue + maxDeviation * (random.nextDouble() - 0.5) * 2.0
+//                totalPerturbation += abs(actualValue - perturbedValue)
 
-            if (perturbedValue > 1.0) perturbedValue = 1.0
-            if (perturbedValue < 0.0) perturbedValue = 0.0
-
-            totalPerturbation += abs(actualValue - perturbedValue)
-
-            sensorData[index] = perturbedValue
+                trackEdgeSensors[index] = perturbedValue
+            }
         }
     }
 }

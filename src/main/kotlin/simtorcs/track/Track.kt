@@ -234,7 +234,7 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
             val prevSegment = segments[if (firstSegmentID > 0) firstSegmentID - 1 else segments.size - 1]
             car.currentSegment = prevSegment
             car.position =
-                prevSegment.centreStart.addNew(prevSegment.centreEnd.subtract(prevSegment.centreStart).multiply(0.1))
+                prevSegment.centreStart.add(prevSegment.centreEnd.subtract(prevSegment.centreStart).scale(0.1))
 
             // Set the car's heading in segment axis direction.
             car.heading = prevSegment.segmentAngle

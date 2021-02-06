@@ -1,6 +1,5 @@
 package simtorcs.track
 
-import simtorcs.geometry.Line
 import simtorcs.geometry.LineSegment
 import simtorcs.geometry.Vector2
 import kotlin.math.*
@@ -9,7 +8,7 @@ import kotlin.math.*
 abstract class Segment(val previous: Segment?, val track: Track) {
     companion object {
         fun getWeightedCentre(a: Vector2, b: Vector2, factor: Double): Vector2 {
-            return a.multiply(factor).addNew(b.multiply(1.0 - factor))
+            return a.scale(factor).add(b.scale(1.0 - factor))
         }
     }
 
@@ -102,13 +101,13 @@ abstract class Segment(val previous: Segment?, val track: Track) {
 
         axis = LineSegment(centreStart, centreEnd)
 
-        segmentDirection = centreEnd.subtract(centreStart).norm()
+        segmentDirection = centreEnd.subtract(centreStart).normalize()
         segmentAngle = atan2(segmentDirection.y, segmentDirection.x)
 
-        measuredLength = centreEnd.distance(centreStart)
+        measuredLength = centreEnd.distanceTo(centreStart)
 
-        widthStart = p1.distance(p2)
-        widthEnd = p3.distance(p4)
+        widthStart = p1.distanceTo(p2)
+        widthEnd = p3.distanceTo(p4)
 
 //        idealStart = centreStart
 //        idealEnd = centreEnd
@@ -128,8 +127,8 @@ abstract class Segment(val previous: Segment?, val track: Track) {
     /**
      * Returns the normalized segment lines. Required for drawing the segment on the screen.
      */
-    fun getNormSegmentLines(): List<Line> {
-        val result = mutableListOf<Line>()
+    fun getNormSegmentLines(): List<LineSegment> {
+        val result = mutableListOf<LineSegment>()
 
         for (line in segmentLines) {
             val fromNew = Vector2(
@@ -141,7 +140,7 @@ abstract class Segment(val previous: Segment?, val track: Track) {
                 (line.to.y - track.yMin) / (track.yMax - track.yMin)
             )
 
-            result.add(Line(fromNew, toNew))
+            result.add(LineSegment(fromNew, toNew))
         }
 
         return result

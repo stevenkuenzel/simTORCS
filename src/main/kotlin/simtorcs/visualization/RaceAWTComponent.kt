@@ -62,7 +62,7 @@ class RaceAWTComponent(val race: Race, val drawSize: Int) : Component() {
                 (((car.position.y - race.track.yMin) / (race.track.yMax - race.track.yMin)) * drawSize.toDouble()).toInt()
 
             val lookingDir = Vector2.fromAngleInRad(car.heading)
-            val endPoint = car.position.addNew(lookingDir.multiply(10.0))
+            val endPoint = car.position.add(lookingDir.scale(10.0))
 
             val xTo =
                 (((endPoint.x - race.track.xMin) / (race.track.xMax - race.track.xMin)) * drawSize.toDouble()).toInt()
