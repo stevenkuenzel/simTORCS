@@ -30,6 +30,9 @@ class SensorInformation(val noise: Boolean, numOfSensors: Int) {
      */
     private val random by lazy { RandomSource.create(RandomSource.MT)!! }
 
+    /**
+     * Attributes in TORCS SCR to: distRaced.
+     */
     var roundsFinished = 0
     var segmentPosition = 0.0
 

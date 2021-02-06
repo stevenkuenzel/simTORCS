@@ -4,7 +4,7 @@ import simtorcs.car.SensorInformation
 import kotlin.math.exp
 
 /**
- * A simple controller driving at _targetSpeed_ always steering towards the track axis.
+ * A simple controller driving at _targetSpeed_ always steering towards the track axis. Inspired by the SimpleDrive example AI controller of TORCS SCR.
  */
 class TestController(private val targetSpeed: Double) : CarController() {
     override fun control(si: SensorInformation): CarInput {
