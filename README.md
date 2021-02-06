@@ -5,8 +5,7 @@ A lightweight Kotlin 2-d racing car environment with an abstract physics engine,
 * Lightweight 2-d racing car environment highly influenced by the TORCS Simulated Car Racing Championship
 * Train AI racing car controllers fast (compared to the approach in [TORCS SCR][1])
 * Import original TORCS tracks into a 2-d equivalent in simTORCS
-* 
-* Visual observation of the race
+* (Rudimentary) Visual observation of the race to verify the trained controllers
 
 ## Limitations
 * The physics engine does not reach the degree of detail that TORCS have. For example the cars are accelerating with constant torque (however, that constant was determined in order to match the behaviour of **car1-trb1** as close as possible). Also,
@@ -28,6 +27,7 @@ The source code of the physics engine is based on [this JavaScript implementatio
 1. Checkout the project from GitHub and import it into your IDE
 2. Run the application via the **main** method of the class **simtorcs.Main** (it provides the implementation of an exemplary race with two cars controlled by naive controllers).
 3. Your own AI controller has to extend the **simtorcs.car.control.CarController** class.
+4. **TODO: DESCRIBE HOW TO RETRIEVE THE CONTROLLER FITNESS.**
 
 ## Future Work
 * Improve the import function or provide all default TORCS tracks as working variants
