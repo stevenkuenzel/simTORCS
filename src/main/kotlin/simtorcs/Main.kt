@@ -46,7 +46,7 @@ class Main {
             }
 
             // End the race, update fitness values.
-            car.raceEnd()
+//            car.raceEnd()
         }
     }
 }

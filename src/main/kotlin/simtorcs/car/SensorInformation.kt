@@ -1,29 +1,11 @@
 package simtorcs.car
 
-import org.apache.commons.rng.UniformRandomProvider
 import org.apache.commons.rng.simple.RandomSource
-import kotlin.math.abs
+import simtorcs.race.Race
+import simtorcs.track.Track
 
-class SensorInformation(val noise: Boolean, numOfSensors: Int) {
-    companion object {
-        // Maximum and minimum speed considered.
-        val SPEED_MIN = 50.0 / 3.6 // in [m/s]
+class SensorInformation(val noise: Boolean, val track: Track, numOfSensors: Int) {
 
-        /**
-         * The maximum speed of the car. Based on the approx. max. speed of car1-trb1 in TORCS.
-         */
-        val SPEED_MAX = 330.0 / 3.6 // in [m/s]
-
-        /**
-         * The maximum range covered by the track edge sensors.
-         */
-        val SENSOR_RANGE = 200.0 // in [m]eters.
-
-        /**
-         * The maximum deviation of the track edge sensor values in percent.
-         */
-        val MAX_RANDOM_DEVIATION = 0.05
-    }
 
     /**
      * Use the Mersenne Twister random number generator.
@@ -34,6 +16,7 @@ class SensorInformation(val noise: Boolean, numOfSensors: Int) {
      * Attributes in TORCS SCR to: distRaced.
      */
     var roundsFinished = 0
+    var lapPosition = 0.0
     var segmentPosition = 0.0
 
     /**
@@ -56,6 +39,14 @@ class SensorInformation(val noise: Boolean, numOfSensors: Int) {
      */
     var trackEdgeSensors = Array(numOfSensors) { 0.0 }
 
+
+
+    val distanceRaced get() = roundsFinished.toDouble() * track.length + lapPosition + segmentPosition
+
+    var ticksInOrBeforeTurns = 0
+    var tooLowTurnSpeed = 0.0
+    var lengthDrivenStraight = 0.0
+
     fun perturbIfNecessary() {
         if (noise) {
 //            var totalPerturbation = 0.0
@@ -63,7 +54,7 @@ class SensorInformation(val noise: Boolean, numOfSensors: Int) {
             for (index in trackEdgeSensors.indices) {
                 val actualValue = trackEdgeSensors[index]
 
-                var perturbedValue = actualValue + MAX_RANDOM_DEVIATION * (random.nextDouble() - 0.5) * 2.0
+                var perturbedValue = actualValue + Race.MAX_RANDOM_DEVIATION * (random.nextDouble() - 0.5) * 2.0
 
                 if (perturbedValue > 1.0) perturbedValue = 1.0
                 if (perturbedValue < 0.0) perturbedValue = 0.0

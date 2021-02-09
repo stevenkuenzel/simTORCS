@@ -46,25 +46,6 @@ class Car(private val race: Race, noisySensors: Boolean) {
 
 
         /**
-         * FITNESS RELATED CONSTANTS.
-         */
-
-        /**
-         * The maximum possible turn speed is multiplied with that constant. If the car is driving faster through the turn than the resulting value, it positively contributes to the corresponding fitness value.
-         */
-        val TURN_SPEED_MULTIPLIER = 0.95
-
-        /**
-         * The distance at which the possible speed is linearly reduced to the turn speed. In meters.
-         */
-        val TURN_SPEED_DISTANCE_MAX = 50.0
-
-        /**
-         * The maximum inclination of the steering wheel to be the car considered as driving straight. (In percent of STEER_MAX radians).
-         */
-        val THRESHOLD_DRIVING_STRAIGHT = 0.05
-
-        /**
          * Maximum steering angle in radians
          */
         private val STEER_MAX = 0.366519
@@ -114,8 +95,12 @@ class Car(private val race: Race, noisySensors: Boolean) {
 //    var wasOffTrack = false
 
     var sensors: Array<Vector2>? = null
-    private val sensorAngles = defineSensorAngles(RANGE_TRACK_EDGE_SENSOR_LEFT, RANGE_TRACK_EDGE_SENSOR_RIGHT, ANGLE_BETWEEN_TRACK_EDGE_SENSORS)
-    var sensorInformation = SensorInformation(noisySensors, sensorAngles.size)
+    private val sensorAngles = defineSensorAngles(
+        RANGE_TRACK_EDGE_SENSOR_LEFT,
+        RANGE_TRACK_EDGE_SENSOR_RIGHT,
+        ANGLE_BETWEEN_TRACK_EDGE_SENSORS
+    )
+    var sensorInformation = SensorInformation(noisySensors, race.track, sensorAngles.size)
     var heading = track.startingDirection
     var position = track.startingPoint.copy()
     var currentSegment: Segment? = null
@@ -133,24 +118,21 @@ class Car(private val race: Race, noisySensors: Boolean) {
 
     var distanceRaced = 0.0
     var speedReachedMax = 0.0
-    var lengthDrivenStraight = 0.0
-    var tooLowTurnSpeed = 0.0
-    var ticksInOrBeforeTurns = 0
 
 
     fun setController(controller: CarController) {
         this.controller = controller
     }
 
-    fun raceEnd() {
-        distanceRaced = sensorInformation.roundsFinished.toDouble() * race.track.length
-
-        if (currentSegment != null) {
-            distanceRaced += lastValidSegment!!.totalTrackLength + sensorInformation.segmentPosition
-        } else if (lastValidSegment != null) {
-            distanceRaced += lastValidSegment!!.totalTrackLength
-        }
-    }
+//    fun raceEnd() {
+//        distanceRaced = sensorInformation.roundsFinished.toDouble() * race.track.length
+//
+//        if (currentSegment != null) {
+//            distanceRaced += lastValidSegment!!.totalTrackLength + sensorInformation.segmentPosition
+//        } else if (lastValidSegment != null) {
+//            distanceRaced += lastValidSegment!!.totalTrackLength
+//        }
+//    }
 
     private fun updateFitnessRelatedInformation(dt: Double, targetSteer: Double) {
         // Fitness: Turn speed score.
@@ -165,34 +147,34 @@ class Car(private val race: Race, noisySensors: Boolean) {
             } else {
                 val nextTurn = currentSegment!!.nextTurn!!
 
-                if (nextTurn.maxSpeed >= SensorInformation.SPEED_MAX) {
+                if (nextTurn.maxSpeed >= Race.SPEED_MAX) {
                     // The car is on a straight or the next turn is close to straight.
                     carIsInTurnOrApproaching = false
-                    SensorInformation.SPEED_MAX
+                    Race.SPEED_MAX
                 } else {
                     // The next turn is a real "turn". Determine the distance to it.
                     val distance = min(
-                        TURN_SPEED_DISTANCE_MAX, if (nextTurn.segments.first().id < currentSegment!!.id)
+                        Race.TURN_SPEED_DISTANCE_MAX, if (nextTurn.segments.first().id < currentSegment!!.id)
                             track.length - (currentSegment!!.totalTrackLength + sensorInformation.segmentPosition) + nextTurn.segments.first().totalTrackLength
                         else nextTurn.segments.first().totalTrackLength - (currentSegment!!.totalTrackLength + sensorInformation.segmentPosition)
                     )
 
-                    carIsInTurnOrApproaching = distance < TURN_SPEED_DISTANCE_MAX
+                    carIsInTurnOrApproaching = distance < Race.TURN_SPEED_DISTANCE_MAX
 
                     // Reduce the approx. max. speed linearly in relation to the distance to the turn.
-                    nextTurn.maxSpeed + (SensorInformation.SPEED_MAX - nextTurn.maxSpeed) * (distance / TURN_SPEED_DISTANCE_MAX)
+                    nextTurn.maxSpeed + (Race.SPEED_MAX - nextTurn.maxSpeed) * (distance / Race.TURN_SPEED_DISTANCE_MAX)
                 }
-            } * TURN_SPEED_MULTIPLIER
+            } * Race.TURN_SPEED_MULTIPLIER
 
             if (carIsInTurnOrApproaching) {
                 // Update the fitness value. Note: A speed higher than possibleSpeed contributes positively to the fitness value.
-                tooLowTurnSpeed += possibleSpeed - absoluteVelocity
-                ticksInOrBeforeTurns++
+                sensorInformation.tooLowTurnSpeed += possibleSpeed - absoluteVelocity
+                sensorInformation.ticksInOrBeforeTurns++
             }
         }
 
-        if (abs(targetSteer) <= THRESHOLD_DRIVING_STRAIGHT) {
-            lengthDrivenStraight += absoluteVelocity * dt
+        if (abs(targetSteer) <= Race.THRESHOLD_DRIVING_STRAIGHT) {
+            sensorInformation.lengthDrivenStraight += absoluteVelocity * dt
         }
     }
 
@@ -272,7 +254,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
 
         for (index in sensors!!.indices) {
             val sensorLine =
-                LineSegment(position, position.add(sensors!![index].scale(SensorInformation.SENSOR_RANGE)))
+                LineSegment(position, position.add(sensors!![index].scale(Race.SENSOR_RANGE)))
 
             var dMin = Double.MAX_VALUE
             var found = false
@@ -281,7 +263,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
             var segmentIndex = currentSegment!!.id
 
             // Iterate over the next segments, break if the max. sensor range is exceeded
-            while (totalDistanceToSegment <= SensorInformation.SENSOR_RANGE) {
+            while (totalDistanceToSegment <= Race.SENSOR_RANGE) {
                 val segment = track.segments[segmentIndex]
                 totalDistanceToSegment += segment.measuredLength
 
@@ -304,7 +286,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
             }
 
             // Replace the sensor value.
-            if (found) data[index] = (dMin / SensorInformation.SENSOR_RANGE)
+            if (found) data[index] = (dMin / Race.SENSOR_RANGE)
         }
 
         return data
@@ -342,10 +324,16 @@ class Car(private val race: Race, noisySensors: Boolean) {
         val distanceOnStraightsAt180KMH = distanceAt180KMH * (race.track.straightLength / race.track.length)
 
         val fDistance = 1.0 - min(1.0, distanceRaced / distanceAt180KMH)
-        val fTurnSpeed = if (ticksInOrBeforeTurns == 0) 1.0 else
-            max(0.0, min(1.0, tooLowTurnSpeed / (ticksInOrBeforeTurns.toDouble() * Race.FPS.toDouble())))
+        val fTurnSpeed = if (sensorInformation.ticksInOrBeforeTurns == 0) 1.0 else
+            max(
+                0.0,
+                min(
+                    1.0,
+                    sensorInformation.tooLowTurnSpeed / (sensorInformation.ticksInOrBeforeTurns * Race.FPS).toDouble()
+                )
+            )
 
-        val fDrivingStraight = 1.0 - min(1.0, lengthDrivenStraight / distanceOnStraightsAt180KMH)
+        val fDrivingStraight = 1.0 - min(1.0, sensorInformation.lengthDrivenStraight / distanceOnStraightsAt180KMH)
 
 
 
@@ -360,6 +348,7 @@ class Car(private val race: Race, noisySensors: Boolean) {
 
         if (currentSegment != null) {
             lastValidSegment = currentSegment
+            sensorInformation.lapPosition = lastValidSegment!!.totalTrackLength
 
             // Count the number of visited segments.
             if (previousSegment != currentSegment) {
