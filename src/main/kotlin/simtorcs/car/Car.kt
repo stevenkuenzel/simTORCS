@@ -8,7 +8,7 @@ import simtorcs.track.Segment
 import simtorcs.geometry.GeometryUtils
 import kotlin.math.*
 
-class Car(private val race: Race, noisySensors: Boolean) {
+class Car(val race: Race, noisySensors: Boolean) {
 
     companion object {
 //        private fun defineSensorAngles(from: Double, to: Double, number: Int): Array<Double> {
@@ -305,41 +305,6 @@ class Car(private val race: Race, noisySensors: Boolean) {
             Vector2.fromAngleInRad(target)
         }
     }
-
-
-    /**
-     * The fitness functions described in my dissertation.
-     */
-    fun getFitness(): Array<Double> {
-        /*
-        Successful,if
-        f1 <= 0.2 -- avg speed >= 144km/h
-        f2 <= 0.1 -- in 90 % of all measured points, speed lies at 0.95 x max measured turn speed of more
-        f3 <= 0.15 -- more than 85 % of the total straight length of the track are driven with only minor steering wheel movements
-         */
-
-        // Define the required constants:
-        val metersPerTickAt180KMH = (180.0 / 3.6) * Race.DT
-        val distanceAt180KMH = metersPerTickAt180KMH * race.tMax.toDouble()
-        val distanceOnStraightsAt180KMH = distanceAt180KMH * (race.track.straightLength / race.track.length)
-
-        val fDistance = 1.0 - min(1.0, distanceRaced / distanceAt180KMH)
-        val fTurnSpeed = if (sensorInformation.ticksInOrBeforeTurns == 0) 1.0 else
-            max(
-                0.0,
-                min(
-                    1.0,
-                    sensorInformation.tooLowTurnSpeed / (sensorInformation.ticksInOrBeforeTurns * Race.FPS).toDouble()
-                )
-            )
-
-        val fDrivingStraight = 1.0 - min(1.0, sensorInformation.lengthDrivenStraight / distanceOnStraightsAt180KMH)
-
-
-
-        return arrayOf(fDistance, fTurnSpeed, fDrivingStraight)
-    }
-
 
     private fun updateGameState(): SensorInformation {
         sensorInformation.absoluteVelocity = absoluteVelocity

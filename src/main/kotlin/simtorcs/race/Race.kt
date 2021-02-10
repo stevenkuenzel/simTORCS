@@ -60,8 +60,6 @@ class Race(val track: Track, val noise: Boolean, val tMax: Int = 6000) {
         while (tNow < tMax && !raceFinished) {
             update()
         }
-
-        if (!raceFinished) raceEnd()
     }
 
     fun createCar(): Car {
@@ -76,14 +74,8 @@ class Race(val track: Track, val noise: Boolean, val tMax: Int = 6000) {
             car.update(DT)
         }
 
-        if (cars.all { it.disqualified }) raceEnd()
+        if (cars.all { it.disqualified }) raceFinished = true
 
         tNow++
-    }
-
-    fun raceEnd() {
-        raceFinished = true
-
-        cars.forEach { it.raceEnd() }
     }
 }

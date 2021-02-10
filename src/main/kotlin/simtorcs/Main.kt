@@ -1,13 +1,16 @@
 package simtorcs
 
+import simtorcs.car.Car
 import simtorcs.car.control.TestController
 import simtorcs.race.Race
 import simtorcs.track.Track
 import simtorcs.visualization.RaceAWTComponent
 import javax.swing.JFrame
+import kotlin.math.max
+import kotlin.math.min
 
 class Main {
-    companion object{
+    companion object {
         @JvmStatic
 
         fun main(args: Array<String>) {
@@ -45,8 +48,32 @@ class Main {
                 Thread.sleep((1000.0 / (timeMultiplier * Race.FPS)).toLong())
             }
 
-            // End the race, update fitness values.
-//            car.raceEnd()
+            println("Fitness of car: " + getFitness(car).contentToString())
+            println("Fitness of car2: " + getFitness(car2).contentToString())
+        }
+
+
+        /**
+         * Example: The fitness functions described in my dissertation.
+         */
+        private fun getFitness(car: Car): Array<Double> {
+            // Define the required constants:
+            val metersPerTickAt180KMH = (180.0 / 3.6) * Race.DT
+            val distanceAt180KMH = metersPerTickAt180KMH * car.race.tMax.toDouble()
+            val distanceOnStraightsAt180KMH = distanceAt180KMH * (car.track.straightLength / car.track.length)
+
+            // ... and the fitness functions. See my dissertation for the description.
+            val fDistance = 1.0 - min(1.0, car.sensorInformation.distanceRaced / distanceAt180KMH)
+            val fTurnSpeed = if (car.sensorInformation.ticksInOrBeforeTurns == 0) 1.0 else
+                (car.sensorInformation.tooLowTurnSpeed / (car.sensorInformation.ticksInOrBeforeTurns * Race.FPS).toDouble()).coerceIn(
+                    0.0,
+                    1.0
+                )
+
+            val fDrivenStraight =
+                1.0 - min(1.0, car.sensorInformation.lengthDrivenStraight / distanceOnStraightsAt180KMH)
+
+            return arrayOf(fDistance, fTurnSpeed, fDrivenStraight)
         }
     }
 }
