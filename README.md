@@ -27,7 +27,7 @@ The source code of the physics engine is based on [this JavaScript implementatio
 1. Checkout the project from GitHub and import it into your IDE
 2. Run the application via the **main** method of the class **simtorcs.Main** (it provides the implementation of an exemplary race with two cars controlled by naive controllers).
 3. Your own AI controller has to extend the **simtorcs.car.control.CarController** class.
-4. **TODO: DESCRIBE HOW TO RETRIEVE THE CONTROLLER FITNESS.**
+4. Retrieve fitness information from the **simtorcs.car.SensorInformation** instance of your car. See the method **getFitness** in the class **simtorcs.Main** for an example.
 
 ## Future Work
 * Improve the import function or provide all default TORCS tracks as working variants
