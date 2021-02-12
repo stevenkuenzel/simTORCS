@@ -8,7 +8,7 @@ A lightweight Kotlin 2-d racing car environment with an abstract physics engine,
 * (Rudimentary) Visual observation of the race to verify the trained controllers
 
 ## Limitations
-* The physics engine does not reach the degree of detail that TORCS have. For example the cars are accelerating with constant torque (however, that constant was determined in order to match the behaviour of **car1-trb1** as close as possible). Also,
+* The physics engine does not reach the degree of detail that TORCS has. For example, the cars are accelerating with constant torque (however, that constant was determined in order to match the behaviour of **car1-trb1** as close as possible).
 * Only a limited number of sensors are supported (due to the abstract physics engine):
    * Distance raced on the track,
    * Angle to the track axis,
