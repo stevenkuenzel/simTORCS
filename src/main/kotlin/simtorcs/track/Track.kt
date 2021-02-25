@@ -284,7 +284,7 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
 
         // Find the main section of the XML file.
         for (xSection in xElement.getChildren("section")) {
-            if (xSection.getAttributeValue("name") == "Main Track") {
+            if (xSection.getAttributeValueAsString("name") == "Main Track") {
                 xMainTrack = xSection
                 break
             }
@@ -294,7 +294,7 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
 
         // Determine the track width.
         for (xAttNum in xMainTrack!!.getChildren("attnum")) {
-            if (xAttNum.getAttributeValue("name") == "width") {
+            if (xAttNum.getAttributeValueAsString("name") == "width") {
                 trackWidth = xAttNum.getAttributeValueAsDouble("val")
 
                 break
@@ -317,7 +317,7 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
 
         // Find the track segment section.
         for (xSection in xMainTrack.getChildren("section")) {
-            if (xSection.getAttributeValue("name") == "Track Segments") {
+            if (xSection.getAttributeValueAsString("name") == "Track Segments") {
                 xTrackSegments = xSection
             }
         }
@@ -328,8 +328,8 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
 
             // Determine the segment type: str(aight), l(eft)gt, r(ight)gt
             for (xAttStr in xTrackSegment.getChildren("attstr")) {
-                val xName = xAttStr.getAttributeValue("name")
-                val xValue = xAttStr.getAttributeValue("val")
+                val xName = xAttStr.getAttributeValueAsString("name")
+                val xValue = xAttStr.getAttributeValueAsString("val")
 
                 if (xName == "type") {
                     map["type"] = xValue
@@ -339,8 +339,8 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
 
             // Determine the numeric properties of the segment.
             for (xAttNum in xTrackSegment.getChildren("attnum")) {
-                val xName = xAttNum.getAttributeValue("name")
-                val xValue = xAttNum.getAttributeValue("val")
+                val xName = xAttNum.getAttributeValueAsString("name")
+                val xValue = xAttNum.getAttributeValueAsString("val")
 
                 if (xName == "lg") {
                     map["lg"] = xValue
