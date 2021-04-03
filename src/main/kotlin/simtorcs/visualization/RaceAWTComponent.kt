@@ -38,17 +38,6 @@ class RaceAWTComponent(val race: Race, val drawSize: Int) : Component() {
                     (line.to.y * drawSize.toDouble()).toInt()
                 )
             }
-
-            // Draw the ideal line.
-//            g2d.color = Color.BLUE
-//            val axis = segment.getNormIdeal()
-//
-//            g2d.drawLine(
-//                (axis.from.x * drawSize.toDouble()).toInt(),
-//                (axis.from.y * drawSize.toDouble()).toInt(),
-//                (axis.to.x * drawSize.toDouble()).toInt(),
-//                (axis.to.y * drawSize.toDouble()).toInt()
-//            )
         }
 
 

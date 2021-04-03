@@ -209,7 +209,6 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
         }
     }
 
-
     /**
      * Determines the maximum driving speed a turn can be taken with.
      */
@@ -280,7 +279,6 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
 
         var xMainTrack: XElement? = null
         var xTrackSegments: XElement? = null
-//        var xPits: XElement? = null
 
         // Find the main section of the XML file.
         for (xSection in xElement.getChildren("section")) {
@@ -302,18 +300,6 @@ class Track(val name: String = "", private val levelOfDetail: Int = 1) {
         }
 
         startWidth = trackWidth
-
-
-//        for (xSection in xMainTrack.getChildren("section")) {
-//            if (xSection.getAttributeValue("name") == "Pits") {
-//                xPits = xSection
-//            }
-//        }
-//        val pitNames = mutableListOf<String>()
-//
-//        for (xAttStr in xPits!!.getChildren("attstr")) {
-//            pitNames.add(xAttStr.getAttributeValue("val"))
-//        }
 
         // Find the track segment section.
         for (xSection in xMainTrack.getChildren("section")) {

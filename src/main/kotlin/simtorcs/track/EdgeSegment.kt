@@ -15,7 +15,7 @@ class EdgeSegment(from : Segment, to: Segment, private val turn: TurnDirection, 
      *
      * Furthermore, it only contains a single (the "outside") segment line.
 
-    p3    p4
+    p3   (p4)
     |\
     | \
     |  \
@@ -25,15 +25,15 @@ class EdgeSegment(from : Segment, to: Segment, private val turn: TurnDirection, 
 
      OR:
 
-    p3    p4
+    (p3)  p4
         /|
        / |
       /  |
      /   |
     /----|
     p1   p2
-
     */
+
     init {
         p1 = from.p3
         p2 = from.p4

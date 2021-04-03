@@ -11,25 +11,6 @@ import kotlin.math.*
 class Car(val race: Race, noisySensors: Boolean) {
 
     companion object {
-//        private fun defineSensorAngles(from: Double, to: Double, number: Int): Array<Double> {
-//            val angles = mutableListOf<Double>()
-//
-//            val total = abs(from) + abs(to)
-//            val step = total / (number - 1).toDouble()
-//
-//            var value = from
-//
-//            angles.add(-value)
-//
-//            for (i in 1 until number) {
-//                value += step
-//                angles.add(-value)
-//
-//            }
-//
-//            return angles.toTypedArray()
-//        }
-
         val RANGE_TRACK_EDGE_SENSOR_LEFT = -45
         val RANGE_TRACK_EDGE_SENSOR_RIGHT = 45
         val ANGLE_BETWEEN_TRACK_EDGE_SENSORS = 5
@@ -43,7 +24,6 @@ class Car(val race: Race, noisySensors: Boolean) {
 
             return angles.toTypedArray()
         }
-
 
         /**
          * Maximum steering angle in radians
@@ -84,15 +64,10 @@ class Car(val race: Race, noisySensors: Boolean) {
     private var controller: CarController? = null
     val track = race.track
 
-
-//    var visitedSegments = 0
-
-
     var totalDistanceFromTrack = 0.0
     var totalSpeed = 0.0
 
     var disqualified = false
-//    var wasOffTrack = false
 
     var sensors: Array<Vector2>? = null
     private val sensorAngles = defineSensorAngles(
@@ -107,32 +82,31 @@ class Car(val race: Race, noisySensors: Boolean) {
     var lastValidSegment: Segment? = null
     var previousSegment: Segment? = null
 
-
     // Input / Control.
     var throttle = 0.0
     var brake = 0.0
     var steerAngle = 0.0
 
-
     // Fitness.
-
     var distanceRaced = 0.0
     var speedReachedMax = 0.0
 
+    // Physics.
+    var velocity = Vector2()
+    var velocityLocal = Vector2()
+    var acceleration = Vector2()
+    var accelerationLocal = Vector2()
+    var absoluteVelocity = 0.0
+    var yawRate = 0.0
+
+    /**
+     * ABS flag.
+     */
+    var lastBrakeLoosened = true
 
     fun setController(controller: CarController) {
         this.controller = controller
     }
-
-//    fun raceEnd() {
-//        distanceRaced = sensorInformation.roundsFinished.toDouble() * race.track.length
-//
-//        if (currentSegment != null) {
-//            distanceRaced += lastValidSegment!!.totalTrackLength + sensorInformation.segmentPosition
-//        } else if (lastValidSegment != null) {
-//            distanceRaced += lastValidSegment!!.totalTrackLength
-//        }
-//    }
 
     private fun updateFitnessRelatedInformation(dt: Double, targetSteer: Double) {
         // Fitness: Turn speed score.
@@ -319,31 +293,14 @@ class Car(val race: Race, noisySensors: Boolean) {
             if (previousSegment != currentSegment) {
                 if (previousSegment == null) {
                     // First update. Or after loosing track.
-//                    visitedSegments = 0
                 } else {
                     if (previousSegment!!.id == track.segments[track.segments.size - 1].id && currentSegment!!.id == 0) {
                         // Finished round.
                         sensorInformation.roundsFinished++
-
-//                        visitedSegments++
                     } else {
                         val segmentDiff = currentSegment!!.id - previousSegment!!.id
 
                         if (segmentDiff < 0) disqualified = true // The car is driving backwards. Disqualify it.
-
-//                        when {
-//                            segmentDiff < 0 -> {
-//                                // The car is driving backwards. Disqualify it.
-//                                disqualified = true
-//                            }
-//                            segmentDiff <= 3 -> {
-//                                // Entering subsequent segment.
-//                                visitedSegments++
-//                            }
-//                            else -> {
-//                                visitedSegments = 0
-//                            }
-//                        }
                     }
                 }
 
@@ -360,19 +317,12 @@ class Car(val race: Race, noisySensors: Boolean) {
             if (sensorInformation.angleToTrackAxis < -PI) sensorInformation.angleToTrackAxis += 2.0 * PI
             if (sensorInformation.angleToTrackAxis > PI) sensorInformation.angleToTrackAxis -= 2.0 * PI
 
-            // Update Sensors: Angle to segment ideal line. Attention: Has to be determined in advance.
-//            sensorInformation.angleToTrackIdeal = segment.idealAngle - heading
-//            if (sensorInformation.angleToTrackIdeal < -PI) sensorInformation.angleToTrackIdeal += 2.0 * PI
-//            if (sensorInformation.angleToTrackIdeal > PI) sensorInformation.angleToTrackIdeal -= 2.0 * PI
-
-
+            // Update Sensors: Current position concerning track length.
             val detAxis = sign(
                 (segment.centreEnd.x - segment.centreStart.x) * (position.y - segment.centreStart.y) -
                         (segment.centreEnd.y - segment.centreStart.y) * (position.x - segment.centreStart.x)
             ).toInt()
-
             val pAxis = (if (detAxis == 0) position else GeometryUtils.adjPoint(position, segment.axis))
-            // Update Sensors: Current position concerning track length.
             sensorInformation.segmentPosition = segment.centreStart.distanceTo(pAxis)
 
             // Determine the relative position on the track and its width at that position.
@@ -385,33 +335,14 @@ class Car(val race: Race, noisySensors: Boolean) {
             } else {
                 0.0
             }
-
-            // Same for ideal line.
-//            val detIdeal =
-//                sign((segment.idealEnd.x - segment.idealStart.x) * (position.y - segment.idealStart.y) - (segment.idealEnd.y - segment.idealStart.y) * (position.x - segment.idealStart.x)).toInt()
-//            val pIdeal = (if (detIdeal == 0) position else GeometryUtils.adjPoint(position, segment.ideal))!!
-//
-//
-//            sensorInformation.distanceToTrackIdeal = if (detIdeal != 0) {
-//                sign(detIdeal.toDouble()) * position.distance(pIdeal) / (widthAtPoint * 0.5)
-//            } else {
-//                0.0
-//            }
-
         } else {
             // The car has left the track. Disqualify it.
-//            wasOffTrack = true
             disqualified = true
         }
 
         if (abs(sensorInformation.distanceToTrackAxis) > 0.9) {
             totalDistanceFromTrack += abs(sensorInformation.distanceToTrackAxis)
         }
-
-//        if (abs(sensorInformation.distanceToTrackIdeal) > 0.1) {
-//            totalDistanceToIdeal += abs(sensorInformation.distanceToTrackIdeal)
-//        }
-
 
         if (!disqualified) {
             totalSpeed += absoluteVelocity
@@ -423,15 +354,6 @@ class Car(val race: Race, noisySensors: Boolean) {
 
         return sensorInformation
     }
-
-
-    var velocity = Vector2()
-    var velocityLocal = Vector2()
-    var acceleration = Vector2()
-    var accelerationLocal = Vector2()
-    var absoluteVelocity = 0.0
-    var yawRate = 0.0
-
 
     /**
      * Car physics.
@@ -473,14 +395,14 @@ class Car(val race: Race, noisySensors: Boolean) {
         val brake = this.brake * PHYSICS_BRAKE_FORCE
         val throttle = this.throttle * PHYSICS_ENGINE_FORCE
 
-/*
-ONLY BASIC PHYSICS MODEL. Important to tune those constants:
--throttle: to low = training applies too much throttle
- to high = training applies too less throttle.
+        /*
+        ONLY BASIC PHYSICS MODEL. Important to tune those constants:
+        -throttle:
+         --to low = training applies too much throttle,
+         --to high = training applies too less throttle.
 
- CONSIDER Sallab, Ahmad El, et al. "Meta learning Framework for Automated Driving." arXiv preprint arXiv:1706.04038 (2017).
- */
-
+         CONSIDER Sallab, Ahmad El, et al. "Meta learning Framework for Automated Driving." arXiv preprint arXiv:1706.04038 (2017).
+         */
 
         //  Resulting force in local car coordinates.
         //  This is implemented as a RWD car only.
@@ -543,13 +465,9 @@ ONLY BASIC PHYSICS MODEL. Important to tune those constants:
         return min(vMax, max(vMin, n))
     }
 
-
     /**
      * A naive approach on an Anti-lock braking system.
      */
-
-    var lastBrakeLoosened = true
-
     fun filterABS(brake: Double): Double {
         if (brake >= 0.5) {
             val result = if (lastBrakeLoosened) {

@@ -5,6 +5,13 @@ import simtorcs.geometry.Vector2
 import kotlin.math.*
 
 
+/**
+ * An abstract track segment.
+ *
+ * @property previous Reference to the previous track segment, if existing.
+ * @property track Reference to the track.
+ * @constructor Creates a new instance.
+ */
 abstract class Segment(val previous: Segment?, val track: Track) {
     companion object {
         fun getWeightedCentre(a: Vector2, b: Vector2, factor: Double): Vector2 {
@@ -12,7 +19,9 @@ abstract class Segment(val previous: Segment?, val track: Track) {
         }
     }
 
-
+    /**
+     * Segment ID.
+     */
     var id = -1
 
     // The segment coordinates:
@@ -68,20 +77,11 @@ abstract class Segment(val previous: Segment?, val track: Track) {
      */
     var segmentDirection = Vector2()
 
-
-//    var idealAngle = 0.0
-//    var idealDirection = Vector2()
-
-
     // Meta information.
     var measuredLength = 0.0
     var totalTrackLength = 0.0
     var widthStart = 0.0
     var widthEnd = 0.0
-
-//    var idealStart = Vector2()
-//    var idealEnd = Vector2()
-//    var ideal = LineSegment(Vector2(), Vector2())
 
     /**
      * Creates the segment lines.
@@ -108,21 +108,7 @@ abstract class Segment(val previous: Segment?, val track: Track) {
 
         widthStart = p1.distanceTo(p2)
         widthEnd = p3.distanceTo(p4)
-
-//        idealStart = centreStart
-//        idealEnd = centreEnd
-
-//        updateIdeal()
     }
-
-//    fun updateIdeal() {
-//        ideal = LineSegment(idealStart, idealEnd)
-//
-//        if (idealStart.sqrDistance(idealEnd) == 0.0) return
-//
-//        idealDirection = idealEnd.subtract(idealStart).norm()
-//        idealAngle = atan2(idealDirection.y, idealDirection.x)
-//    }
 
     /**
      * Returns the normalized segment lines. Required for drawing the segment on the screen.
@@ -176,32 +162,4 @@ abstract class Segment(val previous: Segment?, val track: Track) {
     override fun hashCode(): Int {
         return id
     }
-
-
-//    fun getNormAxis(): Line {
-//        val fromNew = Vector2(
-//            (axis.from.x - track.xMin) / (track.xMax - track.xMin),
-//            (axis.from.y - track.yMin) / (track.yMax - track.yMin)
-//        )
-//        val toNew = Vector2(
-//            (axis.to.x - track.xMin) / (track.xMax - track.xMin),
-//            (axis.to.y - track.yMin) / (track.yMax - track.yMin)
-//        )
-//
-//        return Line(fromNew, toNew)
-//    }
-
-//    fun getNormIdeal(): Line {
-//        val fromNew = Vector2(
-//            (ideal.from.x - track.xMin) / (track.xMax - track.xMin),
-//            (ideal.from.y - track.yMin) / (track.yMax - track.yMin)
-//        )
-//        val toNew = Vector2(
-//            (ideal.to.x - track.xMin) / (track.xMax - track.xMin),
-//            (ideal.to.y - track.yMin) / (track.yMax - track.yMin)
-//        )
-//
-//        return Line(fromNew, toNew)
-//    }
-
 }
