@@ -35,7 +35,7 @@ The source code of the physics engine is based on [this JavaScript implementatio
 * Provide more sensor values
 
 ## Further Reading
-Please refer to my dissertation which is available on [Athene Forschung] [4].
+Please refer to my dissertation which is available on [Athene Forschung][4].
 
 [1]: https://arxiv.org/pdf/1304.1672.pdf
 [2]: https://github.com/spacejack/carphysics2d/tree/master/public/js
